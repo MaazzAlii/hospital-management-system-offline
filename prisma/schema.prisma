@@ -1,0 +1,245 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─────────────────────────────────────────────
+// RBAC
+// ─────────────────────────────────────────────
+
+model Role {
+  id          String           @id @default(uuid())
+  name        String           @unique // Super Admin, Hospital Admin, Receptionist, Doctor, Lab Technician, Pathologist, Pharmacist, Cashier
+  users       User[]
+  permissions RolePermission[]
+  createdAt   DateTime         @default(now())
+}
+
+model Permission {
+  id          String           @id @default(uuid())
+  action      String           // e.g. "create:patient", "view:invoice"
+  description String?
+  roles       RolePermission[]
+}
+
+model RolePermission {
+  id           String     @id @default(uuid())
+  roleId       String
+  permissionId String
+  role         Role       @relation(fields: [roleId], references: [id])
+  permission   Permission @relation(fields: [permissionId], references: [id])
+
+  @@unique([roleId, permissionId])
+}
+
+model User {
+  id        String     @id @default(uuid())
+  email     String     @unique
+  name      String
+  roleId    String
+  role      Role       @relation(fields: [roleId], references: [id])
+  branchId  String?
+  branch    Branch?    @relation(fields: [branchId], references: [id])
+  isActive  Boolean    @default(true)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  auditLogs AuditLog[]
+  doctor    Doctor?
+}
+
+// ─────────────────────────────────────────────
+// MULTI-BRANCH
+// ─────────────────────────────────────────────
+
+model Branch {
+  id        String   @id @default(uuid())
+  name      String
+  address   String?
+  phone     String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  users     User[]
+}
+
+// ─────────────────────────────────────────────
+// PATIENT
+// ─────────────────────────────────────────────
+
+model Patient {
+  id           String        @id @default(uuid())
+  mrn          String        @unique // e.g. LCC-2026-0001
+  name         String
+  dob          DateTime?
+  gender       String?       // male, female, other
+  phone        String?
+  address      String?
+  bloodGroup   String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  appointments Appointment[]
+  opdVisits    OpdVisit[]
+  invoices     Invoice[]
+}
+
+// ─────────────────────────────────────────────
+// DOCTOR
+// ─────────────────────────────────────────────
+
+model Doctor {
+  id             String           @id @default(uuid())
+  userId         String           @unique
+  user           User             @relation(fields: [userId], references: [id])
+  specialization String?
+  fee            Decimal?         @db.Decimal(10, 2)
+  qualifications String?
+  isActive       Boolean          @default(true)
+  createdAt      DateTime         @default(now())
+  appointments   Appointment[]
+  opdVisits      OpdVisit[]
+  schedules      DoctorSchedule[]
+}
+
+model DoctorSchedule {
+  id        String  @id @default(uuid())
+  doctorId  String
+  doctor    Doctor  @relation(fields: [doctorId], references: [id])
+  dayOfWeek Int     // 0=Sunday ... 6=Saturday
+  startTime String  // "09:00"
+  endTime   String  // "17:00"
+  slotMins  Int     @default(15)
+  isActive  Boolean @default(true)
+}
+
+// ─────────────────────────────────────────────
+// APPOINTMENT
+// ─────────────────────────────────────────────
+
+model Appointment {
+  id          String   @id @default(uuid())
+  patientId   String
+  doctorId    String
+  scheduledAt DateTime
+  status      String   @default("scheduled") // scheduled, completed, cancelled, no-show
+  notes       String?
+  createdAt   DateTime @default(now())
+  patient     Patient  @relation(fields: [patientId], references: [id])
+  doctor      Doctor   @relation(fields: [doctorId], references: [id])
+}
+
+// ─────────────────────────────────────────────
+// OPD VISIT
+// ─────────────────────────────────────────────
+
+model OpdVisit {
+  id           String    @id @default(uuid())
+  patientId    String
+  doctorId     String
+  visitDate    DateTime  @default(now())
+  vitals       Json?     // { bp, pulse, temp, weight, height, spo2 }
+  diagnosis    String?
+  notes        String?
+  followUpDate DateTime?
+  status       String    @default("open") // open, closed
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  patient      Patient   @relation(fields: [patientId], references: [id])
+  doctor       Doctor    @relation(fields: [doctorId], references: [id])
+}
+
+// ─────────────────────────────────────────────
+// BILLING
+// ─────────────────────────────────────────────
+
+model Invoice {
+  id            String        @id @default(uuid())
+  invoiceNo     String        @unique // e.g. LCC-0001
+  sourceType    String        // OPD, Lab, Pharmacy
+  sourceId      String
+  patientId     String
+  subtotal      Decimal       @db.Decimal(10, 2)
+  aoDiscountPct Decimal       @default(0) @db.Decimal(5, 2)
+  discountAmt   Decimal       @default(0) @db.Decimal(10, 2)
+  total         Decimal       @db.Decimal(10, 2)
+  status        String        @default("unpaid") // unpaid, paid, partial
+  paymentMethod String?
+  paidAt        DateTime?
+  notes         String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  patient       Patient       @relation(fields: [patientId], references: [id])
+  items         InvoiceItem[]
+  payments      Payment[]
+}
+
+model InvoiceItem {
+  id          String  @id @default(uuid())
+  invoiceId   String
+  description String
+  quantity    Int     @default(1)
+  unitPrice   Decimal @db.Decimal(10, 2)
+  total       Decimal @db.Decimal(10, 2)
+  invoice     Invoice @relation(fields: [invoiceId], references: [id])
+}
+
+model Payment {
+  id        String   @id @default(uuid())
+  invoiceId String
+  amount    Decimal  @db.Decimal(10, 2)
+  method    String   // cash, card, bank
+  paidAt    DateTime @default(now())
+  note      String?
+  invoice   Invoice  @relation(fields: [invoiceId], references: [id])
+}
+
+// ─────────────────────────────────────────────
+// SETTINGS
+// ─────────────────────────────────────────────
+
+model Settings {
+  id            String  @id @default(uuid())
+  clinicName    String  @default("Life Care Clinic Nawagai, Buner")
+  phone         String  @default("0343-9626941")
+  email         String  @default("shakeelbuneri933@gmail.com")
+  address       String  @default("Nawagai, Buner")
+  logoUrl       String?
+  invoicePrefix String  @default("LCC")
+  taxRate       Decimal @default(0) @db.Decimal(5, 2)
+  currency      String  @default("PKR")
+}
+
+// ─────────────────────────────────────────────
+// AUDIT LOG
+// ─────────────────────────────────────────────
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String
+  action    String   // CREATE, UPDATE, DELETE
+  tableName String
+  recordId  String
+  oldValue  Json?
+  newValue  Json?
+  ipAddress String?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+}
+
+// ─────────────────────────────────────────────
+// NOTIFICATIONS
+// ─────────────────────────────────────────────
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String?  // null = broadcast to all
+  type      String   // low_stock, expiry, appointment, system
+  title     String
+  message   String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
