@@ -93,8 +93,11 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       }
     }
 
+    const url = new URL(request.url);
+    const logoUrl = `${url.protocol}//${url.host}/logo.jpeg`;
+
     const pdfStream = await renderToStream(
-      <LabReportPDF order={order} settings={settings} />
+      <LabReportPDF order={order} settings={settings} logoUrl={logoUrl} />
     );
 
     const readableStream = new ReadableStream({

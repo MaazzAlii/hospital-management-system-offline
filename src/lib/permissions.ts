@@ -41,7 +41,7 @@ export function hasAccess(role: string | null, module: string, action: string = 
       return true; // We allow access to module, but restrict to 'own' at data level
     }
 
-    if (module === 'patients') return action === 'read';
+    if (module === 'patients') return true;
 
     // NO access to Billing, Pharmacy, Settings
     return false;

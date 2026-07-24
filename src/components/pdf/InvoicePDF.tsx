@@ -1,5 +1,5 @@
 import React from 'react';
-import { Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer';
+import { Document, Page, Text, View, StyleSheet, Image } from '@react-pdf/renderer';
 
 const styles = StyleSheet.create({
   page: {
@@ -160,7 +160,7 @@ const styles = StyleSheet.create({
   },
 });
 
-export function InvoicePDF({ invoice, settings }: { invoice: any, settings: any }) {
+export function InvoicePDF({ invoice, settings, logoUrl }: { invoice: any, settings: any, logoUrl?: string }) {
   const currency = settings?.currency || 'PKR';
   const formatCurrency = (amount: number) => `${currency} ${Number(amount).toFixed(2)}`;
   
@@ -171,11 +171,19 @@ export function InvoicePDF({ invoice, settings }: { invoice: any, settings: any 
       <Page size="A4" style={styles.page}>
         {/* Header */}
         <View style={styles.header}>
-          <View style={styles.clinicInfo}>
-            <Text style={styles.clinicName}>{settings?.clinicName || 'Clinic Name'}</Text>
-            <Text style={styles.clinicDetails}>{settings?.address || 'Address'}</Text>
-            <Text style={styles.clinicDetails}>Phone: {settings?.phone || 'Phone'}</Text>
-            <Text style={styles.clinicDetails}>Email: {settings?.email || 'Email'}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+            {logoUrl && (
+              <Image 
+                src={logoUrl} 
+                style={{ width: 70, height: 70, marginRight: 15, objectFit: 'contain' }} 
+              />
+            )}
+            <View>
+              <Text style={styles.clinicName}>LIFE CARE HOSPITAL</Text>
+              <Text style={styles.clinicDetails}>{settings?.address || 'Address'}</Text>
+              <Text style={styles.clinicDetails}>Phone: {settings?.phone || 'Phone'}</Text>
+              <Text style={styles.clinicDetails}>Email: {settings?.email || 'Email'}</Text>
+            </View>
           </View>
           <View>
             <Text style={styles.invoiceTitle}>INVOICE</Text>
@@ -250,7 +258,7 @@ export function InvoicePDF({ invoice, settings }: { invoice: any, settings: any 
 
         {/* Footer */}
         <Text style={styles.footer}>
-          Thank you for trusting {settings?.clinicName} with your healthcare needs.
+          Thank you for trusting LIFE CARE HOSPITAL with your healthcare needs.
         </Text>
       </Page>
     </Document>

@@ -19,9 +19,12 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       return new NextResponse('Invoice not found', { status: 404 });
     }
 
+    const url = new URL(request.url);
+    const logoUrl = `${url.protocol}//${url.host}/logo.jpeg`;
+
     // Render the React-PDF component to a Node stream
     const pdfStream = await renderToStream(
-      <InvoicePDF invoice={invoice} settings={settings} />
+      <InvoicePDF invoice={invoice} settings={settings} logoUrl={logoUrl} />
     );
 
     // Convert the Node stream to a Web ReadableStream
