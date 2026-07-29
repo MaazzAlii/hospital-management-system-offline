@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Search, Plus, Eye, Pencil } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
-import { computeAge } from "@/lib/mock-patients";
+import { computeAge } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
