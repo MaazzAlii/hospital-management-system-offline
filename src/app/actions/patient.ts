@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { getCurrentUserRole, hasAccess } from "@/lib/auth-utils";
+import { generateMRN } from "@/lib/id-generator";
 
 export async function getPatients() {
   try {
@@ -40,32 +41,8 @@ export async function createPatient(data: {
 
     const supabase = await createClient();
 
-    // 1. Generate MRN (e.g. LCC-2026-0001)
-    const year = new Date().getFullYear();
-    const prefix = `LCC-${year}-`;
-    
-    // Fetch the latest MRN for this year to determine the next sequence
-    const { data: latestPatients, error: fetchError } = await supabase
-      .from('Patient')
-      .select('mrn')
-      .ilike('mrn', `${prefix}%`)
-      .order('mrn', { ascending: false })
-      .limit(1);
-
-    if (fetchError) {
-      throw new Error(`Failed to fetch latest MRN: ${fetchError.message}`);
-    }
-
-    let sequence = 1;
-    if (latestPatients && latestPatients.length > 0) {
-      const lastMrn = latestPatients[0].mrn;
-      const lastSeq = parseInt(lastMrn.replace(prefix, ''), 10);
-      if (!isNaN(lastSeq)) {
-        sequence = lastSeq + 1;
-      }
-    }
-
-    const mrn = `${prefix}${String(sequence).padStart(4, "0")}`;
+    // 1. Generate MRN atomically via PostgreSQL sequence
+    const mrn = await generateMRN();
 
     // 2. Insert the new patient
     const { data: newPatient, error: insertError } = await supabase
