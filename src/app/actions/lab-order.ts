@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { getCurrentUserRole, getCurrentDoctorId, hasAccess } from '@/lib/auth-utils'
+import { generateLabOrderNo, generateInvoiceNo } from '@/lib/id-generator'
 
 export async function getLabOrders(query?: string) {
   const { role } = await getCurrentUserRole();
@@ -66,7 +67,7 @@ export async function createLabOrder(data: {
 
   const supabase = await createClient()
 
-  const orderNo = `LAB-${Date.now()}`
+  const orderNo = await generateLabOrderNo()
   const totalAmount = data.tests.reduce((sum, t) => sum + Number(t.price), 0)
 
   // 1. Create LabOrder
@@ -106,19 +107,7 @@ export async function createLabOrder(data: {
   }
 
   // 3. Billing Integration (Invoice)
-  const { data: lastInvoices } = await supabase
-    .from("Invoice")
-    .select("invoiceNo")
-    .order("createdAt", { ascending: false })
-    .limit(1);
-
-  let seq = 1;
-  if (lastInvoices && lastInvoices.length > 0) {
-    const parts = lastInvoices[0].invoiceNo.split("-");
-    const lastSeq = parseInt(parts[parts.length - 1], 10);
-    if (!isNaN(lastSeq)) seq = lastSeq + 1;
-  }
-  const invoiceNo = `LCC-${String(seq).padStart(4, "0")}`;
+  const invoiceNo = await generateInvoiceNo()
 
   const { data: invoice, error: invoiceError } = await supabase
     .from("Invoice")
