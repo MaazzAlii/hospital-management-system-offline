@@ -27,50 +27,62 @@ async function getNextSequenceValue(seqName: string): Promise<number> {
 }
 
 /**
+ * Helper to format IDs with standardized pattern: PREFIX-YYYY-XXXX (e.g. LCC-2026-0042)
+ */
+function formatId(prefix: string, year: number, seq: number): string {
+  return `${prefix}-${year}-${String(seq).padStart(4, '0')}`;
+}
+
+/**
  * Generate formatted MRN: LCC-YYYY-XXXX (e.g., LCC-2026-0042)
  */
 export async function generateMRN(): Promise<string> {
   const year = new Date().getFullYear();
   const seq = await getNextSequenceValue(SEQUENCES.mrn);
-  return `LCC-${year}-${String(seq).padStart(4, '0')}`;
+  return formatId('LCC', year, seq);
 }
 
 /**
- * Generate formatted Invoice No: LCC-XXXX (e.g., LCC-0042)
+ * Generate formatted Invoice No: LCC-YYYY-XXXX (e.g., LCC-2026-0042)
  */
 export async function generateInvoiceNo(): Promise<string> {
+  const year = new Date().getFullYear();
   const seq = await getNextSequenceValue(SEQUENCES.invoice);
-  return `LCC-${String(seq).padStart(4, '0')}`;
+  return formatId('LCC', year, seq);
 }
 
 /**
- * Generate formatted Purchase No: PUR-XXXX (e.g., PUR-0042)
+ * Generate formatted Purchase No: PUR-YYYY-XXXX (e.g., PUR-2026-0042)
  */
 export async function generatePurchaseNo(): Promise<string> {
+  const year = new Date().getFullYear();
   const seq = await getNextSequenceValue(SEQUENCES.purchase);
-  return `PUR-${String(seq).padStart(4, '0')}`;
+  return formatId('PUR', year, seq);
 }
 
 /**
- * Generate formatted Sale No: SALE-XXXX (e.g., SALE-0042)
+ * Generate formatted Sale No: SALE-YYYY-XXXX (e.g., SALE-2026-0042)
  */
 export async function generateSaleNo(): Promise<string> {
+  const year = new Date().getFullYear();
   const seq = await getNextSequenceValue(SEQUENCES.sale);
-  return `SALE-${String(seq).padStart(4, '0')}`;
+  return formatId('SALE', year, seq);
 }
 
 /**
- * Generate formatted Lab Order No: LAB-XXXX (e.g., LAB-0042)
+ * Generate formatted Lab Order No: LAB-YYYY-XXXX (e.g., LAB-2026-0042)
  */
 export async function generateLabOrderNo(): Promise<string> {
+  const year = new Date().getFullYear();
   const seq = await getNextSequenceValue(SEQUENCES.labOrder);
-  return `LAB-${String(seq).padStart(4, '0')}`;
+  return formatId('LAB', year, seq);
 }
 
 /**
- * Generate formatted Sample No: SMP-XXXX (e.g., SMP-0042)
+ * Generate formatted Sample No: SMP-YYYY-XXXX (e.g., SMP-2026-0042)
  */
 export async function generateSampleNo(): Promise<string> {
+  const year = new Date().getFullYear();
   const seq = await getNextSequenceValue(SEQUENCES.sample);
-  return `SMP-${String(seq).padStart(4, '0')}`;
+  return formatId('SMP', year, seq);
 }
