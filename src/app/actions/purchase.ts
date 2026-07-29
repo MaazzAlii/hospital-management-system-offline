@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { getCurrentUserRole, hasAccess } from '@/lib/auth-utils'
 
 export async function getPurchases() {
   const supabase = await createClient()
@@ -22,6 +23,11 @@ export async function getPurchases() {
 }
 
 export async function createPurchase(data: any) {
+  const { role } = await getCurrentUserRole();
+  if (!hasAccess(role, 'pharmacy', 'write')) {
+    throw new Error('Unauthorized');
+  }
+
   const supabase = await createClient()
   // Create Purchase
   const { data: purchase, error: purchaseError } = await supabase
