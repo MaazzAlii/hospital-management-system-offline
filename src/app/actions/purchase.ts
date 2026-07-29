@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { getCurrentUserRole, hasAccess } from '@/lib/auth-utils'
+import { generatePurchaseNo } from '@/lib/id-generator'
 
 export async function getPurchases() {
   const supabase = await createClient()
@@ -29,11 +30,13 @@ export async function createPurchase(data: any) {
   }
 
   const supabase = await createClient()
+  const purchaseNo = data.purchaseNo || (await generatePurchaseNo());
+
   // Create Purchase
   const { data: purchase, error: purchaseError } = await supabase
     .from('Purchase')
     .insert({
-      purchaseNo: data.purchaseNo || `PUR-${Date.now()}`,
+      purchaseNo,
       supplierId: data.supplierId,
       totalAmount: data.totalAmount,
       status: data.status || 'completed',
