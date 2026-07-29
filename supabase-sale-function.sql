@@ -18,7 +18,7 @@ BEGIN
   IF sale_data->>'saleNo' IS NOT NULL AND sale_data->>'saleNo' != '' THEN
     sale_no := sale_data->>'saleNo';
   ELSE
-    SELECT 'SALE-' || LPAD(nextval('sale_seq')::TEXT, 4, '0') INTO sale_no;
+    SELECT 'SALE-' || TO_CHAR(NOW(), 'YYYY') || '-' || LPAD(nextval('sale_seq')::TEXT, 4, '0') INTO sale_no;
   END IF;
 
   -- 1. Loop over items to check stock with row-level locking (FOR UPDATE)
