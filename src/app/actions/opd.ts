@@ -2,7 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
-import { getCurrentUserRole, hasAccess } from "@/lib/auth-utils";
+import { getCurrentUserRole, getCurrentDoctorId, hasAccess } from "@/lib/auth-utils";
 
 export async function createOpdVisit(data: {
   patientId: string;
@@ -18,6 +18,13 @@ export async function createOpdVisit(data: {
   const { role } = await getCurrentUserRole();
   if (!hasAccess(role, 'opd', 'write')) {
     throw new Error("Unauthorized");
+  }
+
+  if (role?.toLowerCase() === 'doctor') {
+    const currentDoctorId = await getCurrentDoctorId();
+    if (!currentDoctorId || data.doctorId !== currentDoctorId) {
+      throw new Error("Unauthorized: Doctors can only create OPD visits for themselves");
+    }
   }
 
   const supabase = await createClient();
@@ -72,7 +79,15 @@ export async function updateOpdVisit(id: string, data: {
   }
 
   const supabase = await createClient();
-  
+
+  if (role?.toLowerCase() === 'doctor') {
+    const currentDoctorId = await getCurrentDoctorId();
+    const { data: existing } = await supabase.from("OpdVisit").select("doctorId").eq("id", id).maybeSingle();
+    if (!existing || existing.doctorId !== currentDoctorId) {
+      throw new Error("Unauthorized: Doctors can only update their own OPD visits");
+    }
+  }
+
   const { error } = await supabase
     .from("OpdVisit")
     .update({
