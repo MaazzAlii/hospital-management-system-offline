@@ -308,14 +308,14 @@ CREATE POLICY "Invoice read all" ON "Invoice"
   TO authenticated
   USING (true);
 
--- Invoice write: billing.ts (billing write = admin/receptionist/cashier),
--- sale.ts (pharmacy write = admin/pharmacist), lab-order.ts (lab write = admin/lab/doctor)
+-- Invoice write: billing.ts (billing write = admin/cashier per permissions.ts),
+-- sale.ts (pharmacy write = admin/pharmacist), lab-order.ts (lab write = admin/lab/doctor).
+-- Receptionist is READ-ONLY on billing in permissions.ts — removed for RLS/app-layer consistency.
 CREATE POLICY "Invoice write allowed roles" ON "Invoice"
   FOR ALL
   TO authenticated
   USING (
     user_has_role('admin') OR
-    user_has_role('receptionist') OR
     user_has_role('cashier') OR
     user_has_role('pharmacist') OR
     user_has_role('lab') OR
@@ -323,7 +323,6 @@ CREATE POLICY "Invoice write allowed roles" ON "Invoice"
   )
   WITH CHECK (
     user_has_role('admin') OR
-    user_has_role('receptionist') OR
     user_has_role('cashier') OR
     user_has_role('pharmacist') OR
     user_has_role('lab') OR
@@ -338,13 +337,12 @@ CREATE POLICY "InvoiceItem read all" ON "InvoiceItem"
   TO authenticated
   USING (true);
 
--- InvoiceItem write: same roles as Invoice (all three action files insert items)
+-- InvoiceItem write: same roles as Invoice (receptionist removed — read-only on billing)
 CREATE POLICY "InvoiceItem write allowed roles" ON "InvoiceItem"
   FOR ALL
   TO authenticated
   USING (
     user_has_role('admin') OR
-    user_has_role('receptionist') OR
     user_has_role('cashier') OR
     user_has_role('pharmacist') OR
     user_has_role('lab') OR
@@ -352,7 +350,6 @@ CREATE POLICY "InvoiceItem write allowed roles" ON "InvoiceItem"
   )
   WITH CHECK (
     user_has_role('admin') OR
-    user_has_role('receptionist') OR
     user_has_role('cashier') OR
     user_has_role('pharmacist') OR
     user_has_role('lab') OR
@@ -367,12 +364,13 @@ CREATE POLICY "Payment read all" ON "Payment"
   TO authenticated
   USING (true);
 
--- Payment write: only billing.ts inserts into Payment (no pharmacy/lab side effects)
+-- Payment write: only billing.ts inserts into Payment (no pharmacy/lab side effects).
+-- Receptionist removed — read-only on billing per permissions.ts.
 CREATE POLICY "Payment write allowed roles" ON "Payment"
   FOR ALL
   TO authenticated
-  USING (user_has_role('admin') OR user_has_role('receptionist') OR user_has_role('cashier'))
-  WITH CHECK (user_has_role('admin') OR user_has_role('receptionist') OR user_has_role('cashier'));
+  USING (user_has_role('admin') OR user_has_role('cashier'))
+  WITH CHECK (user_has_role('admin') OR user_has_role('cashier'));
 
 -- ---------- Medicine, MedicineCategory, Supplier ----------
 DROP POLICY IF EXISTS "Medicine read all" ON "Medicine";
@@ -477,15 +475,32 @@ CREATE POLICY "LabOrder write allowed" ON "LabOrder"
 DROP POLICY IF EXISTS "LabOrderItem read all" ON "LabOrderItem";
 CREATE POLICY "LabOrderItem read all" ON "LabOrderItem" FOR SELECT TO authenticated USING (true);
 DROP POLICY IF EXISTS "LabOrderItem write allowed" ON "LabOrderItem";
--- LabOrderItem write: Doctor inserts LabOrderItems only via createLabOrder() which already
--- enforces doctor-ownership at the app layer on the parent LabOrder. At DB level, bare
--- 'doctor' without an ownership sub-select would allow any doctor to write any LabOrderItem.
--- Removing bare 'doctor' here; doctors pass through the 'lab' action path's createLabOrder.
+-- LabOrderItem write: mirrors LabOrder's ownership-scoped pattern.
+-- Doctor is allowed when they own the parent LabOrder (via labOrderId join),
+-- preventing any doctor from writing items onto another doctor's order.
 CREATE POLICY "LabOrderItem write allowed" ON "LabOrderItem"
   FOR ALL
   TO authenticated
-  USING (user_has_role('admin') OR user_has_role('lab'))
-  WITH CHECK (user_has_role('admin') OR user_has_role('lab'));
+  USING (
+    user_has_role('admin') OR
+    user_has_role('lab') OR
+    (user_has_role('doctor') AND EXISTS (
+      SELECT 1 FROM "LabOrder" lo
+      JOIN "Doctor" d ON d.id = lo."doctorId"
+      WHERE lo.id = "LabOrderItem"."labOrderId"
+        AND d."userId" = auth.uid()
+    ))
+  )
+  WITH CHECK (
+    user_has_role('admin') OR
+    user_has_role('lab') OR
+    (user_has_role('doctor') AND EXISTS (
+      SELECT 1 FROM "LabOrder" lo
+      JOIN "Doctor" d ON d.id = lo."doctorId"
+      WHERE lo.id = "LabOrderItem"."labOrderId"
+        AND d."userId" = auth.uid()
+    ))
+  );
 
 DROP POLICY IF EXISTS "Sample read all" ON "Sample";
 CREATE POLICY "Sample read all" ON "Sample" FOR SELECT TO authenticated USING (true);
