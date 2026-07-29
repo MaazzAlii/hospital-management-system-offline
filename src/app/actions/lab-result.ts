@@ -2,9 +2,10 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
-import { getCurrentUserRole, hasAccess } from "@/lib/auth-utils"
+import { getCurrentUserRole, getCurrentDoctorId, hasAccess } from "@/lib/auth-utils"
 
 export async function getLabOrderDetails(id: string) {
+  const { role } = await getCurrentUserRole();
   const supabase = await createClient()
 
   // 1. Fetch Order with Patient
@@ -21,6 +22,13 @@ export async function getLabOrderDetails(id: string) {
   if (orderError || !order) {
     console.error('Error fetching lab order:', orderError)
     throw new Error('Order not found')
+  }
+
+  if (role?.toLowerCase() === 'doctor') {
+    const currentDoctorId = await getCurrentDoctorId();
+    if (order.doctorId && order.doctorId !== currentDoctorId) {
+      throw new Error('Unauthorized: Doctor can only access their own lab order details');
+    }
   }
 
   // 2. Fetch Order Items with Test Details
