@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { getCurrentUserRole, hasAccess } from "@/lib/auth-utils";
+import { getErrorMessage } from "@/lib/error-utils";
 
 export async function getMedicineCategories() {
   const supabase = await createClient();
@@ -34,9 +35,9 @@ export async function createCategory(name: string) {
 
     if (error) throw new Error(error.message);
     return { success: true, category: data };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Failed to create category:", error);
-    return { success: false, error: error.message || "Failed to create category" };
+    return { success: false, error: getErrorMessage(error, "Failed to create category") };
   }
 }
 
@@ -77,9 +78,9 @@ export async function createMedicine(data: {
     
     revalidatePath("/pharmacy/medicines");
     return { success: true, medicine: newMedicine };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Failed to create medicine:", error);
-    return { success: false, error: error.message || "Failed to create medicine" };
+    return { success: false, error: getErrorMessage(error, "Failed to create medicine") };
   }
 }
 
@@ -134,7 +135,7 @@ export async function getMedicines(query?: string) {
     }
 
     return medicines;
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("Failed to get medicines:", error);
     return [];
   }
