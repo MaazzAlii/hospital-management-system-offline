@@ -53,4 +53,10 @@ check-*.ts
 scratch/
 *.scratch.*
 
+# AI agent instruction files
+AGENTS.md
+CLAUDE.md
+.ai/
+
+
 
