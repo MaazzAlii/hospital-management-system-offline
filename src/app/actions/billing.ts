@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 
 import { getCurrentUserRole, hasAccess } from "@/lib/auth-utils";
+import { generateInvoiceNo } from "@/lib/id-generator";
 
 export interface InvoiceItemInput {
   description: string;
@@ -31,20 +32,8 @@ export async function createInvoice(data: {
 
     const supabase = await createClient();
 
-    // Auto-generate invoice number: LCC-0001
-    const { data: lastInvoices } = await supabase
-      .from("Invoice")
-      .select("invoiceNo")
-      .order("createdAt", { ascending: false })
-      .limit(1);
-
-    let seq = 1;
-    if (lastInvoices && lastInvoices.length > 0) {
-      const parts = lastInvoices[0].invoiceNo.split("-");
-      const lastSeq = parseInt(parts[parts.length - 1], 10);
-      if (!isNaN(lastSeq)) seq = lastSeq + 1;
-    }
-    const invoiceNo = `LCC-${String(seq).padStart(4, "0")}`;
+    // Auto-generate invoice number atomically via sequence
+    const invoiceNo = await generateInvoiceNo();
 
     const subtotal = data.items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
     const discountPct = data.discountPct ?? 0;
