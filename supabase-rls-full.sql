@@ -63,7 +63,18 @@ AS $$
     SELECT 1
     FROM "User" u
     JOIN "Role" r ON u."roleId" = r.id
-    WHERE u.id = auth.uid() AND r.name = role_name
+    WHERE u.id = auth.uid()
+      AND CASE
+        -- 'admin' matches either admin variant
+        WHEN LOWER(role_name) = 'admin' THEN
+          LOWER(r.name) IN ('super admin', 'hospital admin')
+        -- 'lab' matches both lab role variants
+        WHEN LOWER(role_name) = 'lab' THEN
+          LOWER(r.name) IN ('lab technician', 'pathologist')
+        -- all other calls: case-insensitive match (receptionist, doctor, pharmacist, cashier)
+        ELSE
+          LOWER(r.name) = LOWER(role_name)
+      END
   );
 $$;
 
