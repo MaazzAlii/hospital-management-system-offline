@@ -2,9 +2,10 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
-import { getCurrentUserRole, hasAccess } from '@/lib/auth-utils'
+import { getCurrentUserRole, getCurrentDoctorId, hasAccess } from '@/lib/auth-utils'
 
 export async function getLabOrders(query?: string) {
+  const { role } = await getCurrentUserRole();
   const supabase = await createClient()
 
   let request = supabase
@@ -15,6 +16,15 @@ export async function getLabOrders(query?: string) {
       Doctor:doctorId (id)
     `)
     .order('orderedAt', { ascending: false })
+
+  if (role?.toLowerCase() === 'doctor') {
+    const currentDoctorId = await getCurrentDoctorId();
+    if (currentDoctorId) {
+      request = request.eq('doctorId', currentDoctorId);
+    } else {
+      return [];
+    }
+  }
 
   const { data, error } = await request
 
@@ -44,6 +54,14 @@ export async function createLabOrder(data: {
   const { role } = await getCurrentUserRole();
   if (!hasAccess(role, 'lab', 'write')) {
     throw new Error('Unauthorized');
+  }
+
+  if (role?.toLowerCase() === 'doctor') {
+    const currentDoctorId = await getCurrentDoctorId();
+    if (!currentDoctorId) {
+      throw new Error('Doctor profile not found');
+    }
+    data.doctorId = currentDoctorId;
   }
 
   const supabase = await createClient()
