@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { getCurrentUserRole, getCurrentDoctorId, hasAccess } from "@/lib/auth-utils"
+import { generateSampleNo } from "@/lib/id-generator"
 
 export async function getLabOrderDetails(id: string) {
   const { role } = await getCurrentUserRole();
@@ -74,7 +75,7 @@ export async function collectSample(labOrderId: string, sampleType: string) {
 
   const supabase = await createClient()
   
-  const sampleNo = `SMP-${Date.now().toString().slice(-6)}`
+  const sampleNo = await generateSampleNo()
   
   const { data, error } = await supabase
     .from('Sample')
