@@ -39,5 +39,6 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/bui
 
 This application enforces a defense-in-depth security model:
 1. **Primary Authorization**: All data reads and mutations are governed by Next.js Server Actions in `src/app/actions/*` using role-based access control (`hasAccess()`) and doctor row-level filtering (`getCurrentDoctorId()`).
-2. **Database-Level RLS**: Comprehensive Row Level Security (RLS) policies are defined in `supabase-rls.sql` covering all tables to serve as a secondary line of defense against direct Supabase client queries.
+2. **Database-Level RLS**: Full Row Level Security (RLS) policies are configured for all 32 database tables in `supabase-rls-full.sql` (and `supabase-rls.sql`) to serve as a secondary line of defense against direct Supabase client queries.
+
 
