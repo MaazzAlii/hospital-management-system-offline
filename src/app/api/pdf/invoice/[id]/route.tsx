@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { renderToStream } from '@react-pdf/renderer';
 import { InvoicePDF } from '@/components/pdf/InvoicePDF';
 import { getInvoiceById, getClinicSettings } from '@/app/actions/billing';
+import { getCurrentUserRole } from '@/lib/auth-utils';
+import { hasAccess } from '@/lib/permissions';
 import React from 'react';
 
 // Force dynamic generation
@@ -9,6 +11,16 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { user, role } = await getCurrentUserRole();
+
+    if (!user) {
+      return new NextResponse('Unauthorized', { status: 401 });
+    }
+
+    if (!hasAccess(role, 'billing', 'read')) {
+      return new NextResponse('Forbidden', { status: 403 });
+    }
+
     const resolvedParams = await params;
     const [invoice, settings] = await Promise.all([
       getInvoiceById(resolvedParams.id),
