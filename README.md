@@ -34,3 +34,10 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+## Security Architecture & Access Control
+
+This application enforces a defense-in-depth security model:
+1. **Primary Authorization**: All data reads and mutations are governed by Next.js Server Actions in `src/app/actions/*` using role-based access control (`hasAccess()`) and doctor row-level filtering (`getCurrentDoctorId()`).
+2. **Database-Level RLS**: Comprehensive Row Level Security (RLS) policies are defined in `supabase-rls.sql` covering all tables to serve as a secondary line of defense against direct Supabase client queries.
+
