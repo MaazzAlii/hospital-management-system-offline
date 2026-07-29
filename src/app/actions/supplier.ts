@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { getCurrentUserRole, hasAccess } from "@/lib/auth-utils";
 
 export async function getSuppliers(query?: string) {
   try {
@@ -41,6 +42,11 @@ export async function createSupplier(data: {
   isActive: boolean;
 }) {
   try {
+    const { role } = await getCurrentUserRole();
+    if (!hasAccess(role, 'pharmacy', 'write')) {
+      throw new Error("Unauthorized");
+    }
+
     const supabase = await createClient();
     const { data: newSupplier, error } = await supabase
       .from("Supplier")
