@@ -1,6 +1,7 @@
 "use server";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { getCurrentUserRole, hasAccess } from "@/lib/auth-utils";
 
 export async function createAppointment(data: {
   patientId: string;
@@ -10,6 +11,11 @@ export async function createAppointment(data: {
   notes?: string;
 }) {
   try {
+    const { role } = await getCurrentUserRole();
+    if (!hasAccess(role, 'appointments', 'write')) {
+      throw new Error("Unauthorized");
+    }
+
     const supabase = await createClient();
     const scheduledAt = new Date(`${data.date}T${data.time}:00`).toISOString();
 
@@ -36,6 +42,11 @@ export async function updateAppointmentStatus(
   status: "scheduled" | "completed" | "cancelled" | "no-show"
 ) {
   try {
+    const { role } = await getCurrentUserRole();
+    if (!hasAccess(role, 'appointments', 'write')) {
+      throw new Error("Unauthorized");
+    }
+
     const supabase = await createClient();
     const { data: appointment, error } = await supabase.from("Appointment").update({ status }).eq("id", id).select().single();
     if (error) throw new Error(error.message);
