@@ -1,7 +1,4 @@
 import { createClient } from "@supabase/supabase-js";
-import { PrismaClient } from "@prisma/client";
-const prisma = new PrismaClient();
-
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -49,9 +46,10 @@ async function main() {
     console.log(`\nProcessing ${user.email}...`);
     
     // 1. Create or get Role
-    let dbRole = await prisma.role.findUnique({ where: { name: user.role } });
+    let { data: dbRole } = await supabaseAdmin.from("Role").select("*").eq("name", user.role).maybeSingle();
     if (!dbRole) {
-      dbRole = await prisma.role.create({ data: { name: user.role } });
+      const { data: newRole } = await supabaseAdmin.from("Role").insert({ name: user.role }).select().single();
+      dbRole = newRole;
       console.log(`✅ Created missing role: ${user.role}`);
     }
 
@@ -59,7 +57,7 @@ async function main() {
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email: user.email,
       password: user.password,
-      email_confirm: true, // Auto-confirm email
+      email_confirm: true,
     });
 
     if (authError) {
@@ -73,9 +71,6 @@ async function main() {
       console.log(`✅ Created Supabase Auth user: ${user.email} (ID: ${authData.user.id})`);
     }
 
-    // Note: If the user already exists, we might need to get their ID to link them.
-    // For simplicity, we can fetch the user ID or just let Prisma use UUID for its own table
-    // and rely on email matching, but best practice is to store the Auth UUID as the Prisma User ID.
     const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
     const authUser = existingUsers.users.find((u) => u.email === user.email);
     
@@ -84,46 +79,40 @@ async function main() {
       continue;
     }
 
-    // 3. Create or update Prisma User (using Auth UUID as Prisma ID)
-    const dbUser = await prisma.user.upsert({
-      where: { id: authUser.id },
-      update: {
-        email: user.email,
-        name: user.name,
-        roleId: dbRole.id,
-      },
-      create: {
-        id: authUser.id,
-        email: user.email,
-        name: user.name,
-        roleId: dbRole.id,
-      },
-    });
+    // 3. Upsert User record in DB
+    const { data: dbUser, error: userError } = await supabaseAdmin.from("User").upsert({
+      id: authUser.id,
+      email: user.email,
+      name: user.name,
+      roleId: dbRole.id,
+      isActive: true,
+    }).select().single();
     
-    console.log(`✅ Upserted Prisma User: ${dbUser.email} (ID: ${dbUser.id}, Role: ${user.role})`);
+    if (userError) {
+      console.error(`❌ Error upserting User row: ${userError.message}`);
+      continue;
+    }
+
+    console.log(`✅ Upserted DB User: ${dbUser.email} (ID: ${dbUser.id}, Role: ${user.role})`);
     
-    // 4. Create Doctor profile if it's the Doctor
+    // 4. Create Doctor profile if Doctor role
     if (user.role === "Doctor") {
-      await prisma.doctor.upsert({
-        where: { userId: dbUser.id },
-        update: {},
-        create: {
+      const { data: existingDoctor } = await supabaseAdmin.from("Doctor").select("*").eq("userId", dbUser.id).maybeSingle();
+      if (!existingDoctor) {
+        await supabaseAdmin.from("Doctor").insert({
           userId: dbUser.id,
           specialization: "General Practice",
           fee: 500.00,
-        },
-      });
-      console.log(`✅ Created Doctor profile for ${dbUser.name}`);
+          isActive: true,
+        });
+        console.log(`✅ Created Doctor profile for ${dbUser.name}`);
+      }
     }
   }
 
   console.log("\n🎉 All test users processed successfully!");
 }
 
-main()
-  .catch((e) => {
-    console.error("Unhandled error:", e);
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+main().catch((e) => {
+  console.error("Unhandled error:", e);
+});
