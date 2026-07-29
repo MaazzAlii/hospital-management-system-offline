@@ -24,10 +24,23 @@ BEGIN
 END;
 $$;
 
--- 3. Synchronize sequence start values with existing database records (prevents duplicate collisions)
-SELECT setval('mrn_seq', COALESCE((SELECT MAX(CAST(SUBSTRING(mrn, POSITION('-' IN mrn) + 1) AS INTEGER)) FROM "Patient" WHERE mrn ~ '.*-[0-9]+$'), 0));
-SELECT setval('invoice_seq', COALESCE((SELECT MAX(CAST(SUBSTRING(invoiceNo, 5) AS INTEGER)) FROM "Invoice" WHERE invoiceNo ~ 'LCC-[0-9]+'), 0));
-SELECT setval('purchase_seq', COALESCE((SELECT MAX(CAST(SUBSTRING(purchaseNo, 5) AS INTEGER)) FROM "Purchase" WHERE purchaseNo ~ 'PUR-[0-9]+'), 0));
-SELECT setval('sale_seq', COALESCE((SELECT MAX(CAST(SUBSTRING(saleNo, 6) AS INTEGER)) FROM "Sale" WHERE saleNo ~ 'SALE-[0-9]+'), 0));
-SELECT setval('lab_order_seq', COALESCE((SELECT MAX(CAST(SUBSTRING(orderNo, 5) AS INTEGER)) FROM "LabOrder" WHERE orderNo ~ 'LAB-[0-9]+'), 0));
-SELECT setval('sample_seq', COALESCE((SELECT MAX(CAST(SUBSTRING(sampleNo, 5) AS INTEGER)) FROM "Sample" WHERE sampleNo ~ 'SMP-[0-9]+'), 0));
+-- 3. Helper function to extract numeric suffix after the last dash from any ID format (e.g. LCC-2026-0042 -> 42)
+CREATE OR REPLACE FUNCTION extract_last_number(val text) 
+RETURNS INTEGER AS $$
+BEGIN
+  IF val IS NULL OR val = '' THEN
+    RETURN 0;
+  END IF;
+  RETURN COALESCE((REGEXP_MATCHES(val, '-([0-9]+)$'))[1]::INTEGER, 0);
+EXCEPTION WHEN OTHERS THEN
+  RETURN 0;
+END;
+$$ LANGUAGE plpgsql IMMUTABLE;
+
+-- 4. Synchronize sequence start values with maximum numeric suffixes found in existing database records
+SELECT setval('mrn_seq', COALESCE((SELECT MAX(extract_last_number(mrn)) FROM "Patient"), 0));
+SELECT setval('invoice_seq', COALESCE((SELECT MAX(extract_last_number("invoiceNo")) FROM "Invoice"), 0));
+SELECT setval('purchase_seq', COALESCE((SELECT MAX(extract_last_number("purchaseNo")) FROM "Purchase"), 0));
+SELECT setval('sale_seq', COALESCE((SELECT MAX(extract_last_number("saleNo")) FROM "Sale"), 0));
+SELECT setval('lab_order_seq', COALESCE((SELECT MAX(extract_last_number("orderNo")) FROM "LabOrder"), 0));
+SELECT setval('sample_seq', COALESCE((SELECT MAX(extract_last_number("sampleNo")) FROM "Sample"), 0));
