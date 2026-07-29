@@ -23,14 +23,11 @@ export async function login(formData: FormData) {
 }
 
 export async function logout() {
-  console.log("logout() server action triggered");
   try {
     const supabase = await createClient();
     const { error } = await supabase.auth.signOut({ scope: "local" });
     if (error) {
       console.error("Supabase signOut error:", error);
-    } else {
-      console.log("Supabase signOut successful");
     }
   } catch (err: unknown) {
     console.error("Exception during logout:", err);
