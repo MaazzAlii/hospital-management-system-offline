@@ -92,6 +92,11 @@ export async function createInvoice(data: {
 }
 
 export async function getInvoices(query?: string) {
+  const { role } = await getCurrentUserRole();
+  if (!hasAccess(role, 'billing', 'read')) {
+    throw new Error('Unauthorized to view invoices');
+  }
+
   const supabase = await createClient();
   const { data: rawInvoices } = await supabase
     .from("Invoice")
@@ -120,6 +125,11 @@ export async function getInvoices(query?: string) {
 }
 
 export async function getInvoiceById(id: string) {
+  const { role } = await getCurrentUserRole();
+  if (!hasAccess(role, 'billing', 'read')) {
+    throw new Error('Unauthorized to view invoices');
+  }
+
   const supabase = await createClient();
   
   // 1. Fetch the base invoice
