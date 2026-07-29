@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { getCurrentUserRole, hasAccess } from "@/lib/auth-utils";
 
 export async function createOpdVisit(data: {
   patientId: string;
@@ -14,6 +15,11 @@ export async function createOpdVisit(data: {
   followUpDate?: string;
   status?: string;
 }) {
+  const { role } = await getCurrentUserRole();
+  if (!hasAccess(role, 'opd', 'write')) {
+    throw new Error("Unauthorized");
+  }
+
   const supabase = await createClient();
   
   const { data: newVisit, error } = await supabase
@@ -60,6 +66,11 @@ export async function updateOpdVisit(id: string, data: {
   followUpDate?: string;
   status: string;
 }) {
+  const { role } = await getCurrentUserRole();
+  if (!hasAccess(role, 'opd', 'write')) {
+    throw new Error("Unauthorized");
+  }
+
   const supabase = await createClient();
   
   const { error } = await supabase
