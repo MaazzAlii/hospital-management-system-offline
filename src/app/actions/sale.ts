@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { getCurrentUserRole, hasAccess } from '@/lib/auth-utils'
 
 export async function getSales() {
   const supabase = await createClient()
@@ -22,6 +23,11 @@ export async function getSales() {
 }
 
 export async function createSale(data: any) {
+  const { role } = await getCurrentUserRole();
+  if (!hasAccess(role, 'pharmacy', 'write')) {
+    throw new Error('Unauthorized');
+  }
+
   const supabase = await createClient()
   
   // Verify stock before proceeding
