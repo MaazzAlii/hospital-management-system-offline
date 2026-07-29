@@ -32,7 +32,7 @@ export async function logout() {
     } else {
       console.log("Supabase signOut successful");
     }
-  } catch (err) {
+  } catch (err: unknown) {
     console.error("Exception during logout:", err);
   }
   revalidatePath("/", "layout");
