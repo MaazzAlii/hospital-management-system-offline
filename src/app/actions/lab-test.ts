@@ -5,6 +5,11 @@ import { revalidatePath } from 'next/cache'
 import { getCurrentUserRole, hasAccess } from '@/lib/auth-utils'
 
 export async function getLabTests(query?: string) {
+  const { role } = await getCurrentUserRole();
+  if (!hasAccess(role, 'lab', 'read')) {
+    throw new Error('Unauthorized to view lab tests');
+  }
+
   const supabase = await createClient()
 
   let request = supabase
@@ -36,6 +41,11 @@ export async function getLabTests(query?: string) {
 }
 
 export async function getLabCategories() {
+  const { role } = await getCurrentUserRole();
+  if (!hasAccess(role, 'lab', 'read')) {
+    throw new Error('Unauthorized to view lab categories');
+  }
+
   const supabase = await createClient()
   const { data, error } = await supabase
     .from('LabCategory')
