@@ -59,6 +59,11 @@ export async function getLabOrderDetails(id: string) {
 }
 
 export async function collectSample(labOrderId: string, sampleType: string) {
+  const { role } = await getCurrentUserRole();
+  if (!hasAccess(role, 'lab', 'write')) {
+    throw new Error('Unauthorized');
+  }
+
   const supabase = await createClient()
   
   const sampleNo = `SMP-${Date.now().toString().slice(-6)}`
@@ -94,6 +99,11 @@ export async function saveResult(data: {
   patientDob?: string,
   labOrderId: string
 }) {
+  const { role } = await getCurrentUserRole();
+  if (!hasAccess(role, 'lab', 'write')) {
+    throw new Error('Unauthorized');
+  }
+
   const supabase = await createClient()
 
   // Auto-flagging logic
