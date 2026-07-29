@@ -93,7 +93,7 @@ export async function createDoctor(data: {
         type: "recovery",
         email: data.email,
       });
-    } catch (e) {
+    } catch (e: unknown) {
       console.warn("Notice: Failed to send password reset email automatically:", e);
     }
 
