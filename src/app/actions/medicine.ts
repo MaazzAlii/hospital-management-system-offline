@@ -6,6 +6,11 @@ import { getCurrentUserRole, hasAccess } from "@/lib/auth-utils";
 import { getErrorMessage } from "@/lib/error-utils";
 
 export async function getMedicineCategories() {
+  const { role } = await getCurrentUserRole();
+  if (!hasAccess(role, 'pharmacy', 'read')) {
+    throw new Error('Unauthorized to view medicine categories');
+  }
+
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("MedicineCategory")
@@ -86,6 +91,11 @@ export async function createMedicine(data: {
 
 export async function getMedicines(query?: string) {
   try {
+    const { role } = await getCurrentUserRole();
+    if (!hasAccess(role, 'pharmacy', 'read')) {
+      throw new Error('Unauthorized to view medicines');
+    }
+
     const supabase = await createClient();
 
     // Fetch all medicines with their category name
