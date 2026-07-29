@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { getCurrentUserRole, hasAccess } from "@/lib/auth-utils";
+import { getErrorMessage } from "@/lib/error-utils";
 
 export async function getSuppliers(query?: string) {
   try {
@@ -27,7 +28,7 @@ export async function getSuppliers(query?: string) {
     }
 
     return suppliers;
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("Failed to get suppliers:", error);
     return [];
   }
@@ -67,8 +68,8 @@ export async function createSupplier(data: {
 
     revalidatePath("/pharmacy/suppliers");
     return { success: true, supplier: newSupplier };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Failed to create supplier:", error);
-    return { success: false, error: error.message || "Failed to create supplier" };
+    return { success: false, error: getErrorMessage(error, "Failed to create supplier") };
   }
 }
