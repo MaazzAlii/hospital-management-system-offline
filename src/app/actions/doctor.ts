@@ -1,6 +1,7 @@
 "use server";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { getCurrentUserRole, hasAccess } from "@/lib/auth-utils";
 
 export async function createDoctor(data: {
   name: string;
@@ -11,6 +12,11 @@ export async function createDoctor(data: {
   isActive?: boolean;
 }) {
   try {
+    const { role } = await getCurrentUserRole();
+    if (!hasAccess(role, 'doctors', 'write')) {
+      throw new Error("Unauthorized");
+    }
+
     const supabase = await createClient();
 
     // Find "Doctor" role
@@ -52,6 +58,11 @@ export async function createDoctor(data: {
 
 export async function toggleDoctorStatus(id: string, isActive: boolean) {
   try {
+    const { role } = await getCurrentUserRole();
+    if (!hasAccess(role, 'doctors', 'write')) {
+      throw new Error("Unauthorized");
+    }
+
     const supabase = await createClient();
     const { data: doctor, error } = await supabase.from("Doctor").update({ isActive }).eq("id", id).select().single();
     if (error) throw new Error(error.message);
