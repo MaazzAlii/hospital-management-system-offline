@@ -19,8 +19,10 @@ async function getNextSequenceValue(seqName: string): Promise<number> {
   const { data, error } = await supabase.rpc('nextval', { seq_name: seqName });
   
   if (error || data === null || data === undefined) {
-    console.warn(`Fallback for sequence ${seqName}: ${error?.message || 'No data returned'}`);
-    return Math.floor(Date.now() % 10000);
+    throw new Error(
+      `Failed to generate ID sequence for '${seqName}' - please retry. ` +
+      (error?.message ? `(${error.message})` : 'No data returned from sequence RPC.')
+    );
   }
   
   return Number(data);
