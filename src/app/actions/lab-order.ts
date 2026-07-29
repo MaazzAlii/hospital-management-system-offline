@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { getCurrentUserRole, hasAccess } from '@/lib/auth-utils'
 
 export async function getLabOrders(query?: string) {
   const supabase = await createClient()
@@ -40,6 +41,11 @@ export async function createLabOrder(data: {
   notes?: string,
   tests: { testId: string, price: number }[]
 }) {
+  const { role } = await getCurrentUserRole();
+  if (!hasAccess(role, 'lab', 'write')) {
+    throw new Error('Unauthorized');
+  }
+
   const supabase = await createClient()
 
   const orderNo = `LAB-${Date.now()}`
