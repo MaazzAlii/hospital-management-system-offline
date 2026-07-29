@@ -45,3 +45,12 @@ next-env.d.ts
 # project dump
 full_project_dump.txt
 
+# local debug/scratch scripts
+test-*.js
+test-*.ts
+check-*.js
+check-*.ts
+scratch/
+*.scratch.*
+
+
