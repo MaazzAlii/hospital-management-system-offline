@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { getCurrentUserRole, hasAccess } from '@/lib/auth-utils'
 
 export async function getLabTests(query?: string) {
   const supabase = await createClient()
@@ -49,6 +50,11 @@ export async function getLabCategories() {
 }
 
 export async function createLabCategory(name: string) {
+  const { role } = await getCurrentUserRole();
+  if (!hasAccess(role, 'lab', 'write')) {
+    throw new Error('Unauthorized');
+  }
+
   const supabase = await createClient()
   const { data, error } = await supabase
     .from('LabCategory')
@@ -63,6 +69,11 @@ export async function createLabCategory(name: string) {
 }
 
 export async function createLabTest(data: any) {
+  const { role } = await getCurrentUserRole();
+  if (!hasAccess(role, 'lab', 'write')) {
+    throw new Error('Unauthorized');
+  }
+
   const supabase = await createClient()
 
   const { data: test, error } = await supabase
