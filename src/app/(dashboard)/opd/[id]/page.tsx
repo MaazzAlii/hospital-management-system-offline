@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, Stethoscope, FileText, Activity } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/server";
+import { getCurrentUserRole, getCurrentDoctorId } from "@/lib/auth-utils";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +13,7 @@ export default async function OpdVisitDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  const { role } = await getCurrentUserRole();
   const supabase = await createClient();
 
   const { data: visit } = await supabase
@@ -25,6 +27,13 @@ export default async function OpdVisitDetailPage({
 
   if (!visit) {
     notFound();
+  }
+
+  if (role?.toLowerCase() === 'doctor') {
+    const currentDoctorId = await getCurrentDoctorId();
+    if (!currentDoctorId || visit.doctorId !== currentDoctorId) {
+      notFound();
+    }
   }
 
   // Fetch doctor user separately

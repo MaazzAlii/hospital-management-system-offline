@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Plus, Search, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/server";
+import { getCurrentUserRole, getCurrentDoctorId } from "@/lib/auth-utils";
 
 export const dynamic = "force-dynamic";
 
@@ -11,6 +12,7 @@ export default async function OpdVisitsPage({
   searchParams: Promise<{ q?: string }>;
 }) {
   const { q } = await searchParams;
+  const { role } = await getCurrentUserRole();
   const supabase = await createClient();
 
   let query = supabase
@@ -24,6 +26,15 @@ export default async function OpdVisitsPage({
       doctorId
     `)
     .order("visitDate", { ascending: false });
+
+  if (role?.toLowerCase() === 'doctor') {
+    const currentDoctorId = await getCurrentDoctorId();
+    if (currentDoctorId) {
+      query = query.eq("doctorId", currentDoctorId);
+    } else {
+      query = query.eq("id", "00000000-0000-0000-0000-000000000000");
+    }
+  }
 
   if (q) {
     // Basic search filtering (PostgREST does not easily search joined tables without view or rpc, so just filtering by status for now, or you can implement a custom RPC)

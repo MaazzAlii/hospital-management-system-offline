@@ -108,3 +108,108 @@ export async function updateOpdVisit(id: string, data: {
   revalidatePath(`/opd/${id}`);
   return { success: true };
 }
+
+export async function getOpdVisits(query?: string) {
+  const { role } = await getCurrentUserRole();
+  const supabase = await createClient();
+
+  let req = supabase
+    .from("OpdVisit")
+    .select(`
+      id,
+      visitDate,
+      diagnosis,
+      status,
+      vitals,
+      notes,
+      followUpDate,
+      doctorId,
+      patient:Patient(name, mrn)
+    `)
+    .order("visitDate", { ascending: false });
+
+  if (role?.toLowerCase() === 'doctor') {
+    const currentDoctorId = await getCurrentDoctorId();
+    if (currentDoctorId) {
+      req = req.eq("doctorId", currentDoctorId);
+    } else {
+      return [];
+    }
+  }
+
+  const { data: visits, error } = await req;
+
+  if (error) {
+    console.error("Error fetching OPD visits:", error);
+    return [];
+  }
+
+  let doctorUsers: Record<string, string> = {};
+  if (visits && visits.length > 0) {
+    const doctorIds = [...new Set(visits.map((v: any) => v.doctorId))].filter(Boolean);
+    if (doctorIds.length > 0) {
+      const { data: doctorsData } = await supabase.from("Doctor").select("id, userId").in("id", doctorIds);
+      if (doctorsData) {
+        const userIds = doctorsData.map((d: any) => d.userId).filter(Boolean);
+        if (userIds.length > 0) {
+          const { data: usersData } = await supabase.from("User").select("id, name").in("id", userIds);
+          if (usersData) {
+            const userMap = usersData.reduce((acc: any, u: any) => {
+              acc[u.id] = u.name;
+              return acc;
+            }, {} as Record<string, string>);
+            
+            doctorUsers = doctorsData.reduce((acc: any, d: any) => {
+              acc[d.id] = userMap[d.userId] || "Unknown";
+              return acc;
+            }, {} as Record<string, string>);
+          }
+        }
+      }
+    }
+  }
+
+  let resultVisits = (visits || []).map((v: any) => ({
+    ...v,
+    doctorName: doctorUsers[v.doctorId] || "Unknown"
+  }));
+
+  if (query) {
+    const q = query.toLowerCase();
+    resultVisits = resultVisits.filter((v: any) =>
+      (v.status || "").toLowerCase().includes(q) ||
+      (v.diagnosis || "").toLowerCase().includes(q) ||
+      (v.patient?.name || "").toLowerCase().includes(q) ||
+      (v.patient?.mrn || "").toLowerCase().includes(q)
+    );
+  }
+
+  return resultVisits;
+}
+
+export async function getOpdVisitById(id: string) {
+  const { role } = await getCurrentUserRole();
+  const supabase = await createClient();
+
+  const { data: visit, error } = await supabase
+    .from("OpdVisit")
+    .select(`
+      *,
+      patient:Patient(*)
+    `)
+    .eq("id", id)
+    .maybeSingle();
+
+  if (error || !visit) {
+    return null;
+  }
+
+  if (role?.toLowerCase() === 'doctor') {
+    const currentDoctorId = await getCurrentDoctorId();
+    if (visit.doctorId !== currentDoctorId) {
+      throw new Error("Unauthorized: Doctors can only access their own OPD visits");
+    }
+  }
+
+  return visit;
+}
