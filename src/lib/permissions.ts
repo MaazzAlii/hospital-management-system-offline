@@ -36,7 +36,7 @@ export function hasAccess(role: string | null, module: string, action: string = 
   if (role === 'Doctor') {
     if (module === 'dashboard') return true;
     
-    // full access to own appointments/opd/lab orders (enforced further in action)
+    // Access to appointments/opd/lab orders (row-level 'own data' restriction enforced in action handlers)
     if (module === 'appointments' || module === 'opd' || module === 'lab') {
       return true; // We allow access to module, but restrict to 'own' at data level
     }
