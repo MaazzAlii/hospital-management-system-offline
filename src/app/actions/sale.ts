@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { getCurrentUserRole, hasAccess } from '@/lib/auth-utils'
+import { generateSaleNo, generateInvoiceNo } from '@/lib/id-generator'
 
 export async function getSales() {
   const supabase = await createClient()
@@ -51,11 +52,13 @@ export async function createSale(data: any) {
     }
   }
 
+  const saleNo = data.saleNo || (await generateSaleNo());
+
   // Create Sale
   const { data: sale, error: saleError } = await supabase
     .from('Sale')
     .insert({
-      saleNo: data.saleNo || `SALE-${Date.now()}`,
+      saleNo,
       patientId: data.patientId || null,
       totalAmount: data.totalAmount,
       status: data.status || 'completed'
@@ -106,20 +109,8 @@ export async function createSale(data: any) {
     }
 
     // Link Pharmacy Sales to the main Billing/Invoice system
-    // Generate Invoice Number (e.g., LCC-0001 pattern if we want, or use saleNo)
-    const { data: lastInvoices } = await supabase
-      .from("Invoice")
-      .select("invoiceNo")
-      .order("createdAt", { ascending: false })
-      .limit(1);
-
-    let seq = 1;
-    if (lastInvoices && lastInvoices.length > 0) {
-      const parts = lastInvoices[0].invoiceNo.split("-");
-      const lastSeq = parseInt(parts[parts.length - 1], 10);
-      if (!isNaN(lastSeq)) seq = lastSeq + 1;
-    }
-    const invoiceNo = `LCC-${String(seq).padStart(4, "0")}`;
+    // Generate Invoice Number atomically via sequence
+    const invoiceNo = await generateInvoiceNo();
 
     let finalPatientId = data.patientId;
     if (!finalPatientId) {
