@@ -31,82 +31,40 @@ export async function createSale(data: any) {
 
   const supabase = await createClient()
   
-  // Verify stock before proceeding
-  const { data: movements, error: movError } = await supabase
-    .from("StockMovement")
-    .select("medicineId, quantity");
-
-  if (movError) throw new Error("Failed to check stock");
-
-  const stockMap: Record<string, number> = {};
-  if (movements) {
-    movements.forEach((m: any) => {
-      stockMap[m.medicineId] = (stockMap[m.medicineId] || 0) + Number(m.quantity);
-    });
-  }
-
-  for (const item of data.items) {
-    const currentStock = stockMap[item.medicineId] || 0;
-    if (item.quantity > currentStock) {
-      throw new Error(`Quantity for medicine ID ${item.medicineId} exceeds available stock (${currentStock}).`);
-    }
-  }
-
-  const saleNo = data.saleNo || (await generateSaleNo());
-
-  // Create Sale
-  const { data: sale, error: saleError } = await supabase
-    .from('Sale')
-    .insert({
-      saleNo,
+  // Call atomic PostgreSQL function with row-level stock check (FOR UPDATE)
+  const { data: result, error: rpcError } = await supabase.rpc('create_sale_with_stock_check', {
+    sale_data: {
+      saleNo: data.saleNo,
       patientId: data.patientId || null,
       totalAmount: data.totalAmount,
-      status: data.status || 'completed'
-    })
-    .select()
-    .single()
+      status: data.status || 'completed',
+      items: (data.items || []).map((item: any) => ({
+        medicineId: item.medicineId,
+        quantity: item.quantity,
+        outPrice: item.outPrice,
+        total: Number(item.quantity) * Number(item.outPrice)
+      }))
+    }
+  });
 
-  if (saleError) {
-    console.error('Error creating sale:', saleError)
-    throw new Error('Failed to create sale')
+  if (rpcError) {
+    console.error('RPC Error in create_sale_with_stock_check:', rpcError)
+    throw new Error(rpcError.message || 'Failed to create sale')
   }
 
+  if (!result || !result.success) {
+    throw new Error(result?.error || 'Failed to create sale')
+  }
+
+  const sale = {
+    id: result.id,
+    saleNo: result.saleNo,
+    patientId: data.patientId || null,
+    totalAmount: data.totalAmount,
+    status: data.status || 'completed'
+  };
+
   if (data.items && data.items.length > 0) {
-    // Create SaleItems
-    const itemsToInsert = data.items.map((item: any) => ({
-      saleId: sale.id,
-      medicineId: item.medicineId,
-      quantity: item.quantity,
-      outPrice: item.outPrice,
-      total: Number(item.quantity) * Number(item.outPrice)
-    }))
-
-    const { error: itemsError } = await supabase
-      .from('SaleItem')
-      .insert(itemsToInsert)
-
-    if (itemsError) {
-      console.error('Error creating sale items:', itemsError)
-      throw new Error('Failed to create sale items')
-    }
-
-    // Create StockMovements
-    const movementsToInsert = data.items.map((item: any) => ({
-      medicineId: item.medicineId,
-      type: 'sale',
-      quantity: -Math.abs(item.quantity), // Negative for sales
-      referenceId: sale.id,
-      notes: `Sale ${sale.saleNo}`
-    }))
-
-    const { error: movementsError } = await supabase
-      .from('StockMovement')
-      .insert(movementsToInsert)
-
-    if (movementsError) {
-      console.error('Error creating stock movements:', movementsError)
-      throw new Error('Failed to create stock movements')
-    }
 
     // Link Pharmacy Sales to the main Billing/Invoice system
     // Generate Invoice Number atomically via sequence
