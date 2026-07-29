@@ -74,16 +74,18 @@ export default function LoginPage() {
             {isLoading ? "Signing in..." : "Sign in"}
           </Button>
 
-          <div className="mt-6 border-t pt-4">
-            <div className="text-center text-xs text-muted-foreground">
-              <p>Test Accounts (Password: password123):</p>
-              <div className="mt-2 space-y-1 font-mono">
-                <p>admin@lifecare.com</p>
-                <p>reception@lifecare.com</p>
-                <p>doctor@lifecare.com</p>
+          {process.env.NODE_ENV === 'development' && (
+            <div className="mt-6 border-t pt-4">
+              <div className="text-center text-xs text-muted-foreground">
+                <p>Test Accounts (Password: password123):</p>
+                <div className="mt-2 space-y-1 font-mono">
+                  <p>admin@lifecare.com</p>
+                  <p>reception@lifecare.com</p>
+                  <p>doctor@lifecare.com</p>
+                </div>
               </div>
             </div>
-          </div>
+          )}
         </form>
       </div>
     </div>
