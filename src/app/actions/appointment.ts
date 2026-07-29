@@ -1,7 +1,7 @@
 "use server";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
-import { getCurrentUserRole, hasAccess } from "@/lib/auth-utils";
+import { getCurrentUserRole, getCurrentDoctorId, hasAccess } from "@/lib/auth-utils";
 
 export async function createAppointment(data: {
   patientId: string;
@@ -14,6 +14,13 @@ export async function createAppointment(data: {
     const { role } = await getCurrentUserRole();
     if (!hasAccess(role, 'appointments', 'write')) {
       throw new Error("Unauthorized");
+    }
+
+    if (role?.toLowerCase() === 'doctor') {
+      const currentDoctorId = await getCurrentDoctorId();
+      if (!currentDoctorId || data.doctorId !== currentDoctorId) {
+        throw new Error("Unauthorized: Doctors can only create appointments for themselves");
+      }
     }
 
     const supabase = await createClient();
@@ -48,6 +55,15 @@ export async function updateAppointmentStatus(
     }
 
     const supabase = await createClient();
+
+    if (role?.toLowerCase() === 'doctor') {
+      const currentDoctorId = await getCurrentDoctorId();
+      const { data: existing } = await supabase.from("Appointment").select("doctorId").eq("id", id).maybeSingle();
+      if (!existing || existing.doctorId !== currentDoctorId) {
+        throw new Error("Unauthorized: Doctors can only update their own appointments");
+      }
+    }
+
     const { data: appointment, error } = await supabase.from("Appointment").update({ status }).eq("id", id).select().single();
     if (error) throw new Error(error.message);
 
@@ -60,8 +76,10 @@ export async function updateAppointmentStatus(
 }
 
 export async function getAppointmentsWithDetails(query?: string) {
+  const { role } = await getCurrentUserRole();
   const supabase = await createClient();
-  const { data: rawAppointments } = await supabase
+
+  let queryBuilder = supabase
     .from("Appointment")
     .select(`
       id,
@@ -72,6 +90,17 @@ export async function getAppointmentsWithDetails(query?: string) {
       Doctor ( id, userId, specialization )
     `)
     .order("scheduledAt", { ascending: false });
+
+  if (role?.toLowerCase() === 'doctor') {
+    const currentDoctorId = await getCurrentDoctorId();
+    if (currentDoctorId) {
+      queryBuilder = queryBuilder.eq("doctorId", currentDoctorId);
+    } else {
+      return [];
+    }
+  }
+
+  const { data: rawAppointments } = await queryBuilder;
 
   // Fetch users separately
   let usersMap: Record<string, string> = {};
