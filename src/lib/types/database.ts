@@ -114,12 +114,12 @@ export interface Medicine {
   id: string;
   name: string;
   categoryId?: string | null;
-  supplierId?: string | null;
-  batchNo?: string | null;
-  expiryDate?: string | null;
+  manufacturer?: string | null;
   inPrice?: number | null;
   outPrice: number;
-  minStockAlert?: number | null;
+  unit?: string | null;
+  barcode?: string | null;
+  reorderLevel?: number | null;  // low-stock threshold; batchNo/expiryDate live on PurchaseItem
   isActive: boolean;
   createdAt?: string;
 }
