@@ -4,12 +4,24 @@ import { LabReportPDF } from '@/components/pdf/LabReportPDF';
 import { getLabOrderDetails } from '@/app/actions/lab-result';
 import { getClinicSettings } from '@/app/actions/billing';
 import { createClient } from '@/lib/supabase/server';
+import { getCurrentUserRole } from '@/lib/auth-utils';
+import { hasAccess } from '@/lib/permissions';
 import React from 'react';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { user, role } = await getCurrentUserRole();
+
+    if (!user) {
+      return new NextResponse('Unauthorized', { status: 401 });
+    }
+
+    if (!hasAccess(role, 'lab', 'read')) {
+      return new NextResponse('Forbidden', { status: 403 });
+    }
+
     const resolvedParams = await params;
     const supabase = await createClient();
 
@@ -60,12 +72,6 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         .from('User')
         .select('id, name, roleId')
         .in('id', verifierIds);
-        
-      console.log("=== DEBUG LAB REPORT VERIFIER QUERY ===");
-      console.log("verifierIds:", verifierIds);
-      console.log("users:", users);
-      console.log("usersError:", usersError);
-      console.log("=======================================");
         
       if (users && users.length > 0) {
         // 2. Fetch Roles
