@@ -71,4 +71,7 @@ prisma/dev.db-journal
 
 # Agent reference docs (these are just context files)
 _agents/skills/prisma-cli/references/
+.agents/
+.claude/
+.windsurf/
 
