@@ -19,11 +19,7 @@ export default async function SaleViewPage({
     notFound();
   }
 
-  const patientName =
-    sale.patient?.name ||
-    (sale.patient?.firstName ? `${sale.patient.firstName} ${sale.patient.lastName || ''}`.trim() : null) ||
-    sale.customerName ||
-    "Walk-in Customer";
+  const patientName = sale.patient?.name || sale.customerName || "Walk-in Customer";
 
   return (
     <div className="space-y-6">
