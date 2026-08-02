@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { prisma } from "@/lib/prisma";
 import {
   ArrowLeft,
   Mail,
@@ -41,45 +41,45 @@ export default async function DoctorDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const resolvedParams = await params;
-  const supabase = await createClient();
   
-  const { data: doctorRaw, error: doctorError } = await supabase
-    .from("Doctor")
-    .select(`*`)
-    .eq("id", resolvedParams.id)
-    .single();
+  const doctorRaw = await prisma.doctor.findUnique({
+    where: { id: resolvedParams.id },
+    include: {
+      user: true,
+    },
+  });
 
-  if (doctorError) {
-    console.error("Doctor detail query error:", doctorError.message, doctorError.code, "id:", resolvedParams.id);
-  }
   if (!doctorRaw) notFound();
-
-  // Fetch user separately to avoid RLS join issues
-  let user: { name: string; email: string } = { name: "Unknown", email: "" };
-  if (doctorRaw.userId) {
-    const { data: userData } = await supabase
-      .from("User")
-      .select("name, email")
-      .eq("id", doctorRaw.userId)
-      .single();
-    if (userData) user = userData;
-  }
 
   const doctor = {
     ...doctorRaw,
-    user,
+    user: doctorRaw.user
+      ? { name: doctorRaw.user.name, email: doctorRaw.user.email }
+      : { name: "Unknown", email: "" },
+    isActive: doctorRaw.status === "active",
+    qualifications: doctorRaw.qualification,
   };
 
-  const { data: rawAppointments } = await supabase
-    .from("Appointment")
-    .select(`id, scheduledAt, status, Patient ( id, name, mrn )`)
-    .eq("doctorId", resolvedParams.id)
-    .order("scheduledAt", { ascending: false })
-    .limit(10);
+  const rawAppointments = await prisma.appointment.findMany({
+    where: { doctorId: resolvedParams.id },
+    include: {
+      patient: {
+        select: {
+          id: true,
+          name: true,
+          mrn: true,
+        },
+      },
+    },
+    orderBy: {
+      scheduledAt: "desc",
+    },
+    take: 10,
+  });
 
-  const appointments = (rawAppointments || []).map((a: any) => ({
+  const appointments = rawAppointments.map((a) => ({
     ...a,
-    patient: Array.isArray(a.Patient) ? a.Patient[0] : a.Patient,
+    patient: a.patient,
   }));
 
   const initials = doctor.user.name
