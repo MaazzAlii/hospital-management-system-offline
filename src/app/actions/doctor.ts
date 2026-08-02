@@ -130,3 +130,70 @@ export async function getDoctorsWithUsers(query?: string) {
 
   return doctors;
 }
+
+export async function getDoctorById(id: string) {
+  try {
+    const { role } = await getCurrentUserRole();
+    if (!hasAccess(role, 'doctors', 'read')) {
+      return null;
+    }
+
+    return await prisma.doctor.findUnique({
+      where: { id },
+      include: { user: true },
+    });
+  } catch (error) {
+    console.error("Failed to fetch doctor:", error);
+    return null;
+  }
+}
+
+export async function updateDoctor(id: string, data: {
+  name: string;
+  email: string;
+  specialization: string;
+  qualifications: string;
+  fee: number;
+  isActive?: boolean;
+}) {
+  try {
+    const { role } = await getCurrentUserRole();
+    if (!hasAccess(role, 'doctors', 'write')) {
+      throw new Error("Unauthorized");
+    }
+
+    const doctor = await prisma.doctor.findUnique({
+      where: { id },
+      include: { user: true },
+    });
+
+    if (!doctor) {
+      throw new Error("Doctor not found");
+    }
+
+    await prisma.user.update({
+      where: { id: doctor.userId },
+      data: {
+        name: data.name,
+        email: data.email.trim().toLowerCase(),
+      },
+    });
+
+    const updatedDoctor = await prisma.doctor.update({
+      where: { id },
+      data: {
+        specialization: data.specialization,
+        qualification: data.qualifications,
+        fee: data.fee,
+        status: data.isActive === false ? "inactive" : "active",
+      },
+    });
+
+    revalidatePath("/doctors");
+    revalidatePath(`/doctors/${id}`);
+    return { success: true, doctor: updatedDoctor };
+  } catch (error: unknown) {
+    console.error("Failed to update doctor:", error);
+    return { success: false, error: (error instanceof Error ? error.message : String(error)) || "Failed to update doctor" };
+  }
+}
