@@ -4,7 +4,6 @@ import { Badge } from '@/components/ui/badge'
 import { ArrowLeft, FileText } from 'lucide-react'
 import Link from 'next/link'
 import { ResultFormClient } from './result-form'
-import { Button } from '@/components/ui/button'
 import { getCurrentUserRole, hasAccess } from '@/lib/auth-utils'
 
 export const dynamic = 'force-dynamic'
@@ -17,6 +16,11 @@ export default async function LabOrderDetailPage({ params }: { params: Promise<{
   const canVerify = hasAccess(role, 'lab', 'verify_lab');
 
   const hasVerifiedResults = (order.results || []).some((r: any) => r.status === 'verified');
+
+  const patientName = order.patient?.name || (order as any).Patient?.name || 'Walk-in Patient';
+  const patientMrn = order.patient?.mrn || (order as any).Patient?.mrn || '—';
+  const doctorName = order.doctor?.user?.name || (order as any).Doctor?.user?.name || 'Self-Requested';
+  const orderDate = order.createdAt || (order as any).orderedAt || new Date();
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
@@ -50,15 +54,15 @@ export default async function LabOrderDetailPage({ params }: { params: Promise<{
           <CardContent className="space-y-4 text-sm">
             <div>
               <span className="text-muted-foreground block text-xs">Patient</span>
-              <span className="font-medium text-base">{order.Patient?.name} ({order.Patient?.mrn})</span>
+              <span className="font-medium text-base">{patientName} ({patientMrn})</span>
             </div>
             <div>
               <span className="text-muted-foreground block text-xs">Doctor</span>
-              <span className="font-medium">{order.Doctor?.user?.name || 'Self-Requested'}</span>
+              <span className="font-medium">{doctorName}</span>
             </div>
             <div>
               <span className="text-muted-foreground block text-xs">Ordered At</span>
-              <span className="font-medium">{new Date(order.orderedAt).toLocaleString()}</span>
+              <span className="font-medium">{new Date(orderDate).toLocaleString()}</span>
             </div>
             {order.notes && (
               <div>
