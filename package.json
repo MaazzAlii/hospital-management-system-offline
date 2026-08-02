@@ -11,17 +11,24 @@
     "start": "next start",
     "lint": "eslint",
     "electron:dev": "electron .",
-    "electron:build": "next build && electron-builder --win",
-    "postinstall": "electron-builder install-app-deps"
+    "electron:build": "next build && electron-builder --win"
   },
   "build": {
     "appId": "com.lifecare.hms",
     "productName": "Life Care HMS",
+    "npmRebuild": false,
+    "buildDependenciesFromSource": false,
     "directories": {
       "output": "dist"
     },
     "files": [
-      "**/*"
+      "electron/**/*",
+      ".next/**/*",
+      "public/**/*",
+      "node_modules/**/*",
+      "package.json",
+      "prisma/**/*",
+      "hms.db"
     ],
     "win": {
       "target": "nsis"
