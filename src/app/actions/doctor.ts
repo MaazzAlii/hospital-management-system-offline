@@ -81,9 +81,10 @@ export async function toggleDoctorStatus(id: string, isActive: boolean) {
       throw new Error("Unauthorized");
     }
 
-    const supabase = await createClient();
-    const { data: doctor, error } = await supabase.from("Doctor").update({ isActive }).eq("id", id).select().single();
-    if (error) throw new Error(error.message);
+    const doctor = await prisma.doctor.update({
+      where: { id },
+      data: { status: isActive ? "active" : "inactive" },
+    });
 
     revalidatePath("/doctors");
     return { success: true, doctor };
@@ -93,34 +94,34 @@ export async function toggleDoctorStatus(id: string, isActive: boolean) {
 }
 
 export async function getDoctorsWithUsers(query?: string) {
-  const supabase = await createClient();
-  const { data: rawDoctors } = await supabase
-    .from("Doctor")
-    .select(`id, specialization, fee, isActive, qualifications, userId`)
-    .order("createdAt", { ascending: false });
+  const rawDoctors = await prisma.doctor.findMany({
+    include: {
+      user: {
+        select: {
+          name: true,
+          email: true,
+        },
+      },
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+  });
 
-  // Fetch users separately to avoid RLS join issues
-  const userIds = (rawDoctors || []).map((d: any) => d.userId).filter(Boolean);
-  let usersMap: Record<string, { name: string; email: string; isActive: boolean }> = {};
-  if (userIds.length > 0) {
-    const { data: users } = await supabase
-      .from("User")
-      .select("id, name, email, isActive")
-      .in("id", userIds);
-    if (users) {
-      usersMap = Object.fromEntries(users.map((u: any) => [u.id, u]));
-    }
-  }
-
-  let doctors = (rawDoctors || []).map((d: any) => ({
-    ...d,
-    user: usersMap[d.userId] || { name: "Unknown", email: "", isActive: false },
+  let doctors = rawDoctors.map((d) => ({
+    id: d.id,
+    specialization: d.specialization,
+    fee: d.fee,
+    isActive: d.status === "active",
+    qualifications: d.qualification,
+    userId: d.userId,
+    user: d.user || { name: "Unknown", email: "" },
   }));
 
   if (query) {
     const q = query.toLowerCase();
     doctors = doctors.filter(
-      (d) =>
+      (d: any) =>
         (d.user?.name || "").toLowerCase().includes(q) ||
         (d.specialization || "").toLowerCase().includes(q) ||
         (d.user?.email || "").toLowerCase().includes(q)
