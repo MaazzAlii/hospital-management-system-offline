@@ -22,6 +22,19 @@ export async function getPatients() {
   }
 }
 
+export async function getPatientById(id: string) {
+  try {
+    const { role } = await getCurrentUserRole();
+    if (!hasAccess(role, 'patients', 'read')) {
+      return null;
+    }
+    return await prisma.patient.findUnique({ where: { id } });
+  } catch (error) {
+    console.error("Failed to fetch patient:", error);
+    return null;
+  }
+}
+
 export async function createPatient(data: {
   name: string;
   dob: string;
@@ -59,6 +72,44 @@ export async function createPatient(data: {
     return { 
       success: false, 
       error: (error instanceof Error ? error.message : String(error)) || "Failed to create patient" 
+    };
+  }
+}
+
+export async function updatePatient(id: string, data: {
+  name: string;
+  dob: string;
+  gender: string;
+  phone: string;
+  address: string;
+  bloodGroup?: string;
+}) {
+  try {
+    const { role } = await getCurrentUserRole();
+    if (!hasAccess(role, 'patients', 'write')) {
+      throw new Error("Unauthorized to update patients");
+    }
+
+    const updatedPatient = await prisma.patient.update({
+      where: { id },
+      data: {
+        name: data.name,
+        dob: data.dob,
+        gender: data.gender,
+        phone: data.phone,
+        address: data.address,
+        bloodGroup: data.bloodGroup || null,
+      },
+    });
+
+    revalidatePath("/patients");
+    revalidatePath(`/patients/${id}`);
+    return { success: true, patient: updatedPatient };
+  } catch (error: unknown) {
+    console.error("Failed to update patient:", error);
+    return {
+      success: false,
+      error: (error instanceof Error ? error.message : String(error)) || "Failed to update patient",
     };
   }
 }
