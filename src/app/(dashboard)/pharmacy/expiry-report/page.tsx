@@ -38,13 +38,15 @@ export default async function ExpiryReportPage() {
                 </div>
               ) : (
                 items.map((item: any) => {
-                  const expiry = new Date(item.expiryDate)
-                  const isExpired = expiry < today
-                  
+                  const expiry = item.expiryDate ? new Date(item.expiryDate) : new Date();
+                  const isExpired = expiry < today;
+                  const medicineName = item.medicine?.name || item.Medicine?.name || 'Unknown';
+                  const purchaseNo = item.purchase?.purchaseNo || item.Purchase?.purchaseNo || '—';
+
                   return (
                     <div key={item.id} className="grid grid-cols-6 items-center p-4">
                       <div className="col-span-2 font-medium">
-                        {item.Medicine?.name}
+                        {medicineName}
                         <span className="ml-2 text-xs text-muted-foreground font-normal">
                           (Qty: {item.quantity})
                         </span>
@@ -65,10 +67,10 @@ export default async function ExpiryReportPage() {
                         )}
                       </div>
                       <div className="text-sm text-muted-foreground">
-                        {item.Purchase?.purchaseNo || '—'}
+                        {purchaseNo}
                       </div>
                     </div>
-                  )
+                  );
                 })
               )}
             </div>
