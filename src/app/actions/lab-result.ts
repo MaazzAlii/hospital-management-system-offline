@@ -1,28 +1,38 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { prisma } from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
 import { getCurrentUserRole, getCurrentDoctorId, hasAccess } from "@/lib/auth-utils"
 import { generateSampleNo } from "@/lib/id-generator"
 
 export async function getLabOrderDetails(id: string) {
   const { role } = await getCurrentUserRole();
-  const supabase = await createClient()
 
-  // 1. Fetch Order with Patient
-  const { data: order, error: orderError } = await supabase
-    .from('LabOrder')
-    .select(`
-      *,
-      Patient:patientId (id, name, mrn, dob, gender),
-      Doctor:doctorId (id)
-    `)
-    .eq('id', id)
-    .single()
+  const order = await prisma.labOrder.findUnique({
+    where: { id },
+    include: {
+      patient: true,
+      doctor: {
+        include: {
+          user: true,
+        },
+      },
+      items: {
+        include: {
+          test: true,
+        },
+      },
+      samples: true,
+      results: {
+        include: {
+          test: true,
+        },
+      },
+    },
+  });
 
-  if (orderError || !order) {
-    console.error('Error fetching lab order:', orderError)
-    throw new Error('Order not found')
+  if (!order) {
+    throw new Error('Order not found');
   }
 
   if (role?.toLowerCase() === 'doctor') {
@@ -32,39 +42,7 @@ export async function getLabOrderDetails(id: string) {
     }
   }
 
-  // 2. Fetch Order Items with Test Details
-  const { data: items } = await supabase
-    .from('LabOrderItem')
-    .select(`
-      *,
-      LabTest:testId (id, name, code, sampleType, turnaroundHours)
-    `)
-    .eq('labOrderId', id)
-
-  order.items = items || []
-
-  // 3. Fetch Samples
-  const { data: samples } = await supabase
-    .from('Sample')
-    .select('*')
-    .eq('labOrderId', id)
-    
-  order.samples = samples || []
-
-  // 4. Fetch Results
-  const sampleIds = order.samples.map((s: any) => s.id)
-  if (sampleIds.length > 0) {
-    const { data: results } = await supabase
-      .from('LabResult')
-      .select('*')
-      .in('sampleId', sampleIds)
-    
-    order.results = results || []
-  } else {
-    order.results = []
-  }
-
-  return order
+  return order;
 }
 
 export async function collectSample(labOrderId: string, sampleType: string) {
@@ -73,121 +51,77 @@ export async function collectSample(labOrderId: string, sampleType: string) {
     throw new Error('Unauthorized');
   }
 
-  const supabase = await createClient()
-  
-  const sampleNo = await generateSampleNo()
-  
-  const { data, error } = await supabase
-    .from('Sample')
-    .insert({
+  const sampleNo = await generateSampleNo();
+
+  const sample = await prisma.sample.create({
+    data: {
       sampleNo,
       labOrderId,
       sampleType,
-      collectedAt: new Date().toISOString(),
-      status: 'collected'
-    })
-    .select()
-    .single()
+      collectedAt: new Date(),
+      status: 'collected',
+    },
+  });
 
-  if (error) {
-    console.error('Error collecting sample:', error)
-    throw new Error('Failed to collect sample')
-  }
-
-  revalidatePath(`/lab/orders/${labOrderId}`)
-  return data
+  revalidatePath(`/lab/orders/${labOrderId}`);
+  return sample;
 }
 
 export async function saveResult(data: {
-  labOrderItemId: string,
-  sampleId: string,
-  resultValue: string,
-  unit?: string,
-  testId: string,
-  patientGender?: string,
-  patientDob?: string,
-  labOrderId: string
+  labOrderItemId?: string;
+  sampleId?: string;
+  resultValue: string;
+  unit?: string;
+  testId: string;
+  parameterName?: string;
+  patientGender?: string;
+  patientDob?: string;
+  labOrderId: string;
 }) {
   const { role } = await getCurrentUserRole();
   if (!hasAccess(role, 'lab', 'write')) {
     throw new Error('Unauthorized');
   }
 
-  const supabase = await createClient()
+  const parameterName = data.parameterName || "Result";
 
-  // Auto-flagging logic
-  let flag = 'Normal'
-  
-  // Try to find a matching reference range
-  const { data: ranges } = await supabase
-    .from('ReferenceRange')
-    .select('*')
-    .eq('testId', data.testId)
+  const existing = await prisma.labResult.findFirst({
+    where: {
+      labOrderId: data.labOrderId,
+      testId: data.testId,
+    },
+  });
 
-  if (ranges && ranges.length > 0) {
-    // Basic matching: try to match gender if specified in range
-    // A robust system would calculate age and match ageMin/ageMax
-    let matchedRange = ranges.find(r => r.gender === data.patientGender || r.gender === 'All')
-    
-    if (!matchedRange) {
-      matchedRange = ranges[0] // fallback to first range
-    }
-    
-    if (matchedRange && matchedRange.lowValue !== null && matchedRange.highValue !== null) {
-      const numValue = parseFloat(data.resultValue)
-      if (!isNaN(numValue)) {
-        if (numValue < matchedRange.lowValue) flag = 'Low'
-        else if (numValue > matchedRange.highValue) flag = 'High'
-      }
-    }
-  }
-
-  // Check if result already exists for this item
-  const { data: existing } = await supabase
-    .from('LabResult')
-    .select('id')
-    .eq('labOrderItemId', data.labOrderItemId)
-    .maybeSingle()
-
-  let resultError;
-  
   if (existing) {
-    // Update
-    const { error } = await supabase
-      .from('LabResult')
-      .update({
+    await prisma.labResult.update({
+      where: { id: existing.id },
+      data: {
         resultValue: data.resultValue,
-        unit: data.unit,
-        flag,
-        status: 'pending' // Entering a new value resets to pending
-      })
-      .eq('id', existing.id)
-    resultError = error
+        unit: data.unit || null,
+        parameterName,
+        status: 'final',
+      },
+    });
   } else {
-    // Insert
-    const { error } = await supabase
-      .from('LabResult')
-      .insert({
-        labOrderItemId: data.labOrderItemId,
-        sampleId: data.sampleId,
+    await prisma.labResult.create({
+      data: {
+        labOrderId: data.labOrderId,
+        testId: data.testId,
+        parameterName,
         resultValue: data.resultValue,
-        unit: data.unit,
-        flag,
-        status: 'pending'
-      })
-    resultError = error
+        unit: data.unit || null,
+        status: 'final',
+      },
+    });
   }
 
-  if (resultError) {
-    console.error('Error saving result:', resultError)
-    throw new Error('Failed to save result')
-  }
+  await prisma.labOrder.update({
+    where: { id: data.labOrderId },
+    data: { status: 'completed' },
+  });
 
-  // Update order status to in_progress if not already
-  await supabase.from('LabOrder').update({ status: 'in_progress' }).eq('id', data.labOrderId)
-
-  revalidatePath(`/lab/orders/${data.labOrderId}`)
-  return { success: true }
+  revalidatePath(`/lab/orders/${data.labOrderId}`);
+  return { success: true };
 }
 
 export async function verifyResult(resultId: string, labOrderId: string) {
@@ -197,28 +131,16 @@ export async function verifyResult(resultId: string, labOrderId: string) {
       throw new Error("Unauthorized to verify lab results");
     }
 
-    const supabase = await createClient()
-
-    const { data: { user } } = await supabase.auth.getUser()
-    const verifiedBy = user ? user.id : 'system'
-
-    const { error } = await supabase
-      .from('LabResult')
-      .update({
+    await prisma.labResult.update({
+      where: { id: resultId },
+      data: {
         status: 'verified',
-        verifiedBy,
-        verifiedAt: new Date().toISOString()
-      })
-      .eq('id', resultId)
+      },
+    });
 
-    if (error) {
-      console.error('Error verifying result:', error)
-      throw new Error('Failed to verify result')
-    }
-
-    revalidatePath(`/lab/orders/${labOrderId}`)
-    return { success: true }
+    revalidatePath(`/lab/orders/${labOrderId}`);
+    return { success: true };
   } catch (error: unknown) {
-    return { success: false, error: (error instanceof Error ? error.message : String(error)) || "Failed to verify result" }
+    return { success: false, error: (error instanceof Error ? error.message : String(error)) || "Failed to verify result" };
   }
 }
