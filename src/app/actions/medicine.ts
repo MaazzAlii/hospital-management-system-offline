@@ -146,6 +146,7 @@ export async function updateMedicine(id: string, data: {
   outPrice: number;
   unit: string;
   reorderLevel: number;
+  barcode?: string;
 }) {
   try {
     const { role } = await getCurrentUserRole();
@@ -167,6 +168,7 @@ export async function updateMedicine(id: string, data: {
     });
 
     revalidatePath("/pharmacy/medicines");
+    revalidatePath(`/pharmacy/medicines/${id}`);
     return { success: true, medicine };
   } catch (error: unknown) {
     console.error("Failed to update medicine:", error);
