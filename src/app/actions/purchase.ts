@@ -129,29 +129,97 @@ export async function createPurchase(data: {
     };
   }
 }
-export async function updatePurchase(id: string, data: {
-  supplierId?: string;
-  notes?: string;
-  status?: string;
-}) {
+
+export async function updatePurchase(
+  id: string,
+  data: {
+    supplierId?: string;
+    notes?: string;
+    status?: string;
+    totalAmount?: number;
+    items?: Array<{
+      medicineId: string;
+      quantity: number;
+      unitPrice?: number;
+      inPrice?: number;
+      batchNo?: string;
+      expiryDate?: string | Date;
+    }>;
+  }
+) {
   try {
     const { role } = await getCurrentUserRole();
     if (!hasAccess(role, 'pharmacy', 'write')) {
       throw new Error('Unauthorized');
     }
 
-    const purchase = await prisma.purchase.update({
-      where: { id },
-      data: {
-        supplierId: data.supplierId || undefined,
-        notes: data.notes ?? undefined,
-        status: data.status || undefined,
-      },
+    const updatedPurchase = await prisma.$transaction(async (tx) => {
+      let calcTotal = data.totalAmount;
+
+      if (data.items && data.items.length > 0) {
+        // Remove existing stock movements and items for this purchase
+        await tx.stockMovement.deleteMany({
+          where: {
+            referenceType: "Purchase",
+            referenceId: id,
+          },
+        });
+
+        await tx.purchaseItem.deleteMany({
+          where: { purchaseId: id },
+        });
+
+        let newTotal = 0;
+        for (const item of data.items) {
+          const price = item.unitPrice ?? item.inPrice ?? 0;
+          const itemTotal = price * item.quantity;
+          newTotal += itemTotal;
+
+          const createdItem = await tx.purchaseItem.create({
+            data: {
+              purchaseId: id,
+              medicineId: item.medicineId,
+              quantity: item.quantity,
+              unitPrice: price,
+              totalPrice: itemTotal,
+              batchNo: item.batchNo || null,
+              expiryDate: item.expiryDate ? new Date(item.expiryDate) : null,
+            },
+          });
+
+          await tx.stockMovement.create({
+            data: {
+              medicineId: item.medicineId,
+              purchaseItemId: createdItem.id,
+              type: "purchase",
+              quantity: item.quantity,
+              referenceType: "Purchase",
+              referenceId: id,
+              notes: `Purchase updated`,
+            },
+          });
+        }
+
+        if (calcTotal === undefined) {
+          calcTotal = newTotal;
+        }
+      }
+
+      return await tx.purchase.update({
+        where: { id },
+        data: {
+          supplierId: data.supplierId || undefined,
+          notes: data.notes !== undefined ? data.notes : undefined,
+          status: data.status || undefined,
+          totalAmount: calcTotal !== undefined ? calcTotal : undefined,
+        },
+      });
     });
 
     revalidatePath('/pharmacy/purchases');
     revalidatePath(`/pharmacy/purchases/${id}`);
-    return { success: true, purchase };
+    revalidatePath('/pharmacy/medicines');
+    return { success: true, purchase: updatedPurchase };
   } catch (error: unknown) {
     console.error('Error updating purchase:', error);
     return {
