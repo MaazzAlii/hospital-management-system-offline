@@ -1,6 +1,6 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
+import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { getCurrentUserRole, hasAccess } from "@/lib/auth-utils";
 import { getErrorMessage } from "@/lib/error-utils";
@@ -11,17 +11,9 @@ export async function getMedicineCategories() {
     throw new Error('Unauthorized to view medicine categories');
   }
 
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("MedicineCategory")
-    .select("*")
-    .order("name", { ascending: true });
-
-  if (error) {
-    console.error("Error fetching categories:", error);
-    return [];
-  }
-  return data || [];
+  return await prisma.medicineCategory.findMany({
+    orderBy: { name: "asc" },
+  });
 }
 
 export async function createCategory(name: string) {
@@ -31,15 +23,11 @@ export async function createCategory(name: string) {
       throw new Error("Unauthorized to create categories");
     }
 
-    const supabase = await createClient();
-    const { data, error } = await supabase
-      .from("MedicineCategory")
-      .insert([{ name }])
-      .select()
-      .single();
+    const category = await prisma.medicineCategory.create({
+      data: { name },
+    });
 
-    if (error) throw new Error(error.message);
-    return { success: true, category: data };
+    return { success: true, category };
   } catch (error: unknown) {
     console.error("Failed to create category:", error);
     return { success: false, error: getErrorMessage(error, "Failed to create category") };
@@ -62,27 +50,20 @@ export async function createMedicine(data: {
       throw new Error("Unauthorized to create medicines");
     }
 
-    const supabase = await createClient();
-    const { data: newMedicine, error } = await supabase
-      .from("Medicine")
-      .insert([{
+    const medicine = await prisma.medicine.create({
+      data: {
         name: data.name,
-        categoryId: data.categoryId,
+        categoryId: data.categoryId || null,
         manufacturer: data.manufacturer || null,
-        inPrice: Number(data.inPrice),
-        outPrice: Number(data.outPrice),
+        unitPrice: Number(data.inPrice),
+        sellingPrice: Number(data.outPrice),
         unit: data.unit,
         reorderLevel: Number(data.reorderLevel),
-        barcode: data.barcode || null,
-        isActive: true
-      }])
-      .select()
-      .single();
-
-    if (error) throw new Error(error.message);
+      },
+    });
     
     revalidatePath("/pharmacy/medicines");
-    return { success: true, medicine: newMedicine };
+    return { success: true, medicine };
   } catch (error: unknown) {
     console.error("Failed to create medicine:", error);
     return { success: false, error: getErrorMessage(error, "Failed to create medicine") };
@@ -96,57 +77,118 @@ export async function getMedicines(query?: string) {
       throw new Error('Unauthorized to view medicines');
     }
 
-    const supabase = await createClient();
-
-    // Fetch all medicines with their category name
-    const { data: rawMedicines, error: medError } = await supabase
-      .from("Medicine")
-      .select(`
-        *,
-        MedicineCategory ( id, name )
-      `)
-      .order("name", { ascending: true });
-
-    if (medError) throw new Error(medError.message);
-
-    // Fetch all stock movements to compute current stock
-    const { data: movements, error: movError } = await supabase
-      .from("StockMovement")
-      .select("medicineId, quantity");
-
-    if (movError) throw new Error(movError.message);
-
-    // Group movements and calculate sums
-    const stockMap: Record<string, number> = {};
-    if (movements) {
-      movements.forEach((m: any) => {
-        stockMap[m.medicineId] = (stockMap[m.medicineId] || 0) + Number(m.quantity);
-      });
+    let whereClause: any = {};
+    if (query) {
+      whereClause.OR = [
+        { name: { contains: query } },
+        { manufacturer: { contains: query } },
+        { category: { name: { contains: query } } },
+      ];
     }
 
-    let medicines = (rawMedicines || []).map((m: any) => {
-      const cat = Array.isArray(m.MedicineCategory) ? m.MedicineCategory[0] : m.MedicineCategory;
-      const currentStock = stockMap[m.id] || 0;
-      return {
-        ...m,
-        category: cat,
-        currentStock,
-        isLowStock: currentStock <= Number(m.reorderLevel),
-      };
+    const rawMedicines = await prisma.medicine.findMany({
+      where: whereClause,
+      include: {
+        category: {
+          select: { id: true, name: true },
+        },
+        stockMovements: {
+          select: { quantity: true },
+        },
+      },
+      orderBy: { name: "asc" },
     });
 
-    if (query) {
-      const q = query.toLowerCase();
-      medicines = medicines.filter((m) =>
-        (m.name || "").toLowerCase().includes(q) ||
-        (m.manufacturer || "").toLowerCase().includes(q) ||
-        (m.category?.name || "").toLowerCase().includes(q)
-      );
-    }
-
-    return medicines;
+    return rawMedicines.map((m) => {
+      const currentStock = m.stockMovements.reduce((sum, sm) => sum + sm.quantity, 0);
+      return {
+        id: m.id,
+        name: m.name,
+        category: m.category,
+        manufacturer: m.manufacturer,
+        inPrice: m.unitPrice,
+        outPrice: m.sellingPrice,
+        unit: m.unit || "Unit",
+        currentStock,
+        reorderLevel: m.reorderLevel,
+        isLowStock: currentStock <= m.reorderLevel,
+        isActive: true,
+      };
+    });
   } catch (error: unknown) {
     console.error("Failed to get medicines:", error);
     return [];
+  }
+}
+
+export async function getMedicineById(id: string) {
+  try {
+    const { role } = await getCurrentUserRole();
+    if (!hasAccess(role, 'pharmacy', 'read')) {
+      return null;
+    }
+
+    return await prisma.medicine.findUnique({
+      where: { id },
+      include: { category: true },
+    });
+  } catch (error) {
+    console.error("Failed to fetch medicine:", error);
+    return null;
+  }
+}
+
+export async function updateMedicine(id: string, data: {
+  name: string;
+  categoryId: string;
+  manufacturer?: string;
+  inPrice: number;
+  outPrice: number;
+  unit: string;
+  reorderLevel: number;
+}) {
+  try {
+    const { role } = await getCurrentUserRole();
+    if (!hasAccess(role, 'pharmacy', 'write')) {
+      throw new Error("Unauthorized to update medicine");
+    }
+
+    const medicine = await prisma.medicine.update({
+      where: { id },
+      data: {
+        name: data.name,
+        categoryId: data.categoryId || null,
+        manufacturer: data.manufacturer || null,
+        unitPrice: Number(data.inPrice),
+        sellingPrice: Number(data.outPrice),
+        unit: data.unit,
+        reorderLevel: Number(data.reorderLevel),
+      },
+    });
+
+    revalidatePath("/pharmacy/medicines");
+    return { success: true, medicine };
+  } catch (error: unknown) {
+    console.error("Failed to update medicine:", error);
+    return { success: false, error: getErrorMessage(error, "Failed to update medicine") };
+  }
+}
+
+export async function deleteMedicine(id: string) {
+  try {
+    const { role } = await getCurrentUserRole();
+    if (!hasAccess(role, 'pharmacy', 'write')) {
+      throw new Error("Unauthorized to delete medicine");
+    }
+
+    await prisma.medicine.delete({
+      where: { id },
+    });
+
+    revalidatePath("/pharmacy/medicines");
+    return { success: true };
+  } catch (error: unknown) {
+    console.error("Failed to delete medicine:", error);
+    return { success: false, error: getErrorMessage(error, "Failed to delete medicine") };
   }
 }
