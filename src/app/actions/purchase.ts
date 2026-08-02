@@ -129,3 +129,34 @@ export async function createPurchase(data: {
     };
   }
 }
+export async function updatePurchase(id: string, data: {
+  supplierId?: string;
+  notes?: string;
+  status?: string;
+}) {
+  try {
+    const { role } = await getCurrentUserRole();
+    if (!hasAccess(role, 'pharmacy', 'write')) {
+      throw new Error('Unauthorized');
+    }
+
+    const purchase = await prisma.purchase.update({
+      where: { id },
+      data: {
+        supplierId: data.supplierId || undefined,
+        notes: data.notes ?? undefined,
+        status: data.status || undefined,
+      },
+    });
+
+    revalidatePath('/pharmacy/purchases');
+    revalidatePath(`/pharmacy/purchases/${id}`);
+    return { success: true, purchase };
+  } catch (error: unknown) {
+    console.error('Error updating purchase:', error);
+    return {
+      success: false,
+      error: (error instanceof Error ? error.message : String(error)) || 'Failed to update purchase',
+    };
+  }
+}
