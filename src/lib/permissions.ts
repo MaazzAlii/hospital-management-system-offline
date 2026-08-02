@@ -9,15 +9,15 @@ export function hasAccess(role: string | null, module: string, action: string = 
   // Normalize role string to handle different cases and spacing (e.g., 'Super Admin', 'super_admin', 'superadmin')
   const normalizedRole = role.toLowerCase().replace(/_/g, ' ').trim();
 
-  // Super Admin bypass: full access to everything unconditionally
-  if (normalizedRole === 'super admin' || normalizedRole === 'superadmin') return true;
+  // Admin / Super Admin bypass: full access to everything unconditionally
+  if (normalizedRole === 'admin' || normalizedRole === 'super admin' || normalizedRole === 'superadmin') return true;
 
   if (normalizedRole === 'hospital admin' || role === 'Hospital Admin') {
     if (module === 'audit' && action === 'delete') return false;
     return true;
   }
 
-  if (role === 'Receptionist') {
+  if (normalizedRole === 'receptionist') {
     if (action === 'delete') return false;
     if (action === 'apply_discount') return false;
     
@@ -33,7 +33,7 @@ export function hasAccess(role: string | null, module: string, action: string = 
     return false;
   }
 
-  if (role === 'Doctor') {
+  if (normalizedRole === 'doctor') {
     if (module === 'dashboard') return true;
     
     // Access to appointments/opd/lab orders (row-level 'own data' restriction enforced in action handlers)
@@ -47,7 +47,7 @@ export function hasAccess(role: string | null, module: string, action: string = 
     return false;
   }
 
-  if (role === 'Lab Technician') {
+  if (normalizedRole === 'lab technician' || normalizedRole === 'labtechnician') {
     if (module === 'dashboard') return true;
     if (action === 'verify_lab') return false;
     if (action === 'delete') return false;
@@ -57,7 +57,7 @@ export function hasAccess(role: string | null, module: string, action: string = 
     return false;
   }
 
-  if (role === 'Pathologist') {
+  if (normalizedRole === 'pathologist') {
     if (module === 'dashboard') return true;
     if (module === 'lab') return true;
     
@@ -65,7 +65,7 @@ export function hasAccess(role: string | null, module: string, action: string = 
     return false;
   }
 
-  if (role === 'Pharmacist') {
+  if (normalizedRole === 'pharmacist') {
     if (module === 'dashboard') return true;
     if (module === 'pharmacy') return true;
 
@@ -73,7 +73,7 @@ export function hasAccess(role: string | null, module: string, action: string = 
     return false;
   }
 
-  if (role === 'Cashier') {
+  if (normalizedRole === 'cashier') {
     if (module === 'dashboard') return true;
     if (action === 'delete') return false;
 
