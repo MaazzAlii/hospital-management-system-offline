@@ -1,36 +1,49 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
+import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { getCurrentUserRole, hasAccess } from "@/lib/auth-utils";
 import { getErrorMessage } from "@/lib/error-utils";
 
 export async function getSuppliers(query?: string) {
   try {
-    const supabase = await createClient();
-    const { data: rawSuppliers, error } = await supabase
-      .from("Supplier")
-      .select("*")
-      .order("name", { ascending: true });
-
-    if (error) throw new Error(error.message);
-
-    let suppliers = rawSuppliers || [];
-
-    if (query) {
-      const q = query.toLowerCase();
-      suppliers = suppliers.filter(
-        (s) =>
-          (s.name || "").toLowerCase().includes(q) ||
-          (s.contactPerson || "").toLowerCase().includes(q) ||
-          (s.phone || "").toLowerCase().includes(q)
-      );
+    const { role } = await getCurrentUserRole();
+    if (!hasAccess(role, 'pharmacy', 'read')) {
+      throw new Error('Unauthorized to view suppliers');
     }
 
-    return suppliers;
+    let whereClause: any = {};
+    if (query) {
+      whereClause.OR = [
+        { name: { contains: query } },
+        { contactPerson: { contains: query } },
+        { phone: { contains: query } },
+      ];
+    }
+
+    return await prisma.supplier.findMany({
+      where: whereClause,
+      orderBy: { name: "asc" },
+    });
   } catch (error: unknown) {
     console.error("Failed to get suppliers:", error);
     return [];
+  }
+}
+
+export async function getSupplierById(id: string) {
+  try {
+    const { role } = await getCurrentUserRole();
+    if (!hasAccess(role, 'pharmacy', 'read')) {
+      return null;
+    }
+
+    return await prisma.supplier.findUnique({
+      where: { id },
+    });
+  } catch (error) {
+    console.error("Failed to fetch supplier:", error);
+    return null;
   }
 }
 
@@ -40,7 +53,7 @@ export async function createSupplier(data: {
   phone?: string;
   email?: string;
   address?: string;
-  isActive: boolean;
+  isActive?: boolean;
 }) {
   try {
     const { role } = await getCurrentUserRole();
@@ -48,28 +61,52 @@ export async function createSupplier(data: {
       throw new Error("Unauthorized");
     }
 
-    const supabase = await createClient();
-    const { data: newSupplier, error } = await supabase
-      .from("Supplier")
-      .insert([
-        {
-          name: data.name,
-          contactPerson: data.contactPerson || null,
-          phone: data.phone || null,
-          email: data.email || null,
-          address: data.address || null,
-          isActive: data.isActive,
-        },
-      ])
-      .select()
-      .single();
-
-    if (error) throw new Error(error.message);
+    const supplier = await prisma.supplier.create({
+      data: {
+        name: data.name,
+        contactPerson: data.contactPerson || null,
+        phone: data.phone || null,
+        email: data.email || null,
+        address: data.address || null,
+      },
+    });
 
     revalidatePath("/pharmacy/suppliers");
-    return { success: true, supplier: newSupplier };
+    return { success: true, supplier };
   } catch (error: unknown) {
     console.error("Failed to create supplier:", error);
     return { success: false, error: getErrorMessage(error, "Failed to create supplier") };
+  }
+}
+
+export async function updateSupplier(id: string, data: {
+  name: string;
+  contactPerson?: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+}) {
+  try {
+    const { role } = await getCurrentUserRole();
+    if (!hasAccess(role, 'pharmacy', 'write')) {
+      throw new Error("Unauthorized");
+    }
+
+    const supplier = await prisma.supplier.update({
+      where: { id },
+      data: {
+        name: data.name,
+        contactPerson: data.contactPerson || null,
+        phone: data.phone || null,
+        email: data.email || null,
+        address: data.address || null,
+      },
+    });
+
+    revalidatePath("/pharmacy/suppliers");
+    return { success: true, supplier };
+  } catch (error: unknown) {
+    console.error("Failed to update supplier:", error);
+    return { success: false, error: getErrorMessage(error, "Failed to update supplier") };
   }
 }
