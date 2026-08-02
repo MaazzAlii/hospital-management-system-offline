@@ -1,7 +1,4 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
+// Life Care Clinic HMS - Prisma Schema for SQLite
 
 generator client {
   provider = "prisma-client-js"
@@ -9,4 +6,431 @@ generator client {
 
 datasource db {
   provider = "sqlite"
+}
+
+model Counter {
+  name  String @id
+  value Int    @default(0)
+}
+
+model Role {
+  id              String           @id @default(cuid())
+  name            String           @unique
+  description     String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  users           User[]
+  rolePermissions RolePermission[]
+}
+
+model Permission {
+  id              String           @id @default(cuid())
+  module          String
+  action          String
+  description     String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  rolePermissions RolePermission[]
+}
+
+model RolePermission {
+  id           String     @id @default(cuid())
+  roleId       String
+  permissionId String
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, permissionId])
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  passwordHash String?
+  roleId       String?
+  role         Role?    @relation(fields: [roleId], references: [id])
+  doctor       Doctor?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Branch {
+  id        String   @id @default(cuid())
+  name      String
+  address   String?
+  phone     String?
+  isMain    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Patient {
+  id               String        @id @default(cuid())
+  mrn              String        @unique
+  name             String
+  phone            String?
+  email            String?
+  dob              String?
+  gender           String?
+  address          String?
+  bloodGroup       String?
+  emergencyContact String?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  appointments     Appointment[]
+  opdVisits        OpdVisit[]
+  invoices         Invoice[]
+  sales            Sale[]
+  labOrders        LabOrder[]
+}
+
+model Doctor {
+  id             String           @id @default(cuid())
+  userId         String           @unique
+  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  specialization String?
+  qualification  String?
+  fee            Float            @default(0)
+  phone          String?
+  status         String           @default("active")
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  schedules      DoctorSchedule[]
+  appointments   Appointment[]
+  opdVisits      OpdVisit[]
+  labOrders      LabOrder[]
+}
+
+model DoctorSchedule {
+  id           String   @id @default(cuid())
+  doctorId     String
+  doctor       Doctor   @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  dayOfWeek    String
+  startTime    String
+  endTime      String
+  slotDuration Int      @default(15)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Appointment {
+  id          String     @id @default(cuid())
+  patientId   String
+  patient     Patient    @relation(fields: [patientId], references: [id])
+  doctorId    String
+  doctor      Doctor     @relation(fields: [doctorId], references: [id])
+  scheduledAt DateTime
+  status      String     @default("scheduled")
+  reason      String?
+  notes       String?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  opdVisits   OpdVisit[]
+}
+
+model OpdVisit {
+  id            String       @id @default(cuid())
+  patientId     String
+  patient       Patient      @relation(fields: [patientId], references: [id])
+  doctorId      String
+  doctor        Doctor       @relation(fields: [doctorId], references: [id])
+  appointmentId String?
+  appointment   Appointment? @relation(fields: [appointmentId], references: [id])
+  visitDate     DateTime     @default(now())
+  vitals        Json?
+  symptoms      String?
+  diagnosis     String?
+  prescription  Json?
+  notes         String?
+  status        String       @default("open")
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+}
+
+model Invoice {
+  id            String        @id @default(cuid())
+  invoiceNo     String        @unique
+  patientId     String?
+  patient       Patient?      @relation(fields: [patientId], references: [id])
+  sourceType    String?
+  sourceId      String?
+  subtotal      Float         @default(0)
+  discountAmt   Float         @default(0)
+  discountType  String?
+  discountValue Float?
+  taxAmt        Float         @default(0)
+  total         Float         @default(0)
+  paidAmt       Float         @default(0)
+  dueAmt        Float         @default(0)
+  status        String        @default("unpaid")
+  notes         String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  items         InvoiceItem[]
+  payments      Payment[]
+}
+
+model InvoiceItem {
+  id          String   @id @default(cuid())
+  invoiceId   String
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  description String
+  quantity    Int      @default(1)
+  unitPrice   Float    @default(0)
+  amount      Float    @default(0)
+  itemType    String?
+  itemId      String?
+  createdAt   DateTime @default(now())
+}
+
+model Payment {
+  id             String   @id @default(cuid())
+  invoiceId      String
+  invoice        Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  amount         Float
+  paymentMethod  String
+  transactionRef String?
+  notes          String?
+  paidAt         DateTime @default(now())
+}
+
+model Settings {
+  id        String   @id @default(cuid())
+  clinicName String  @default("Life Care Clinic")
+  address   String?
+  phone     String?
+  email     String?
+  logoUrl   String?
+  taxRate   Float    @default(0)
+  currency  String   @default("PKR")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  action    String
+  module    String
+  details   Json?
+  ipAddress String?
+  createdAt DateTime @default(now())
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String?
+  title     String
+  message   String
+  type      String   @default("info")
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model MedicineCategory {
+  id          String     @id @default(cuid())
+  name        String     @unique
+  description String?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  medicines   Medicine[]
+}
+
+model Medicine {
+  id              String            @id @default(cuid())
+  name            String
+  genericName     String?
+  categoryId      String?
+  category        MedicineCategory? @relation(fields: [categoryId], references: [id])
+  manufacturer    String?
+  unitPrice       Float             @default(0)
+  sellingPrice    Float             @default(0)
+  reorderLevel    Int               @default(10)
+  unit            String?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  purchaseItems   PurchaseItem[]
+  stockMovements StockMovement[]
+  saleItems       SaleItem[]
+}
+
+model Supplier {
+  id            String     @id @default(cuid())
+  name          String
+  contactPerson String?
+  phone         String?
+  email         String?
+  address       String?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  purchases     Purchase[]
+}
+
+model Purchase {
+  id          String         @id @default(cuid())
+  purchaseNo  String         @unique
+  supplierId  String?
+  supplier    Supplier?      @relation(fields: [supplierId], references: [id])
+  totalAmount Float          @default(0)
+  status      String         @default("completed")
+  notes       String?
+  purchaseDate DateTime      @default(now())
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  items       PurchaseItem[]
+}
+
+model PurchaseItem {
+  id             String          @id @default(cuid())
+  purchaseId     String
+  purchase       Purchase        @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  medicineId     String
+  medicine       Medicine        @relation(fields: [medicineId], references: [id])
+  batchNo        String?
+  expiryDate     DateTime?
+  quantity       Int
+  unitPrice      Float
+  totalPrice     Float
+  createdAt      DateTime        @default(now())
+  stockMovements StockMovement[]
+}
+
+model StockMovement {
+  id             String        @id @default(cuid())
+  medicineId     String
+  medicine       Medicine      @relation(fields: [medicineId], references: [id])
+  purchaseItemId String?
+  purchaseItem   PurchaseItem? @relation(fields: [purchaseItemId], references: [id])
+  type           String
+  quantity       Int
+  referenceType  String?
+  referenceId    String?
+  notes          String?
+  createdAt      DateTime      @default(now())
+}
+
+model Sale {
+  id            String     @id @default(cuid())
+  saleNo        String     @unique
+  patientId     String?
+  patient       Patient?   @relation(fields: [patientId], references: [id])
+  customerName  String?
+  customerPhone String?
+  totalAmount   Float      @default(0)
+  status        String     @default("completed")
+  saleDate      DateTime   @default(now())
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  items         SaleItem[]
+}
+
+model SaleItem {
+  id         String   @id @default(cuid())
+  saleId     String
+  sale       Sale     @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  medicineId String
+  medicine   Medicine @relation(fields: [medicineId], references: [id])
+  batchNo    String?
+  quantity   Int
+  unitPrice  Float
+  totalPrice Float
+  createdAt  DateTime @default(now())
+}
+
+model LabCategory {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  description String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  tests       LabTest[]
+}
+
+model LabTest {
+  id              String           @id @default(cuid())
+  code            String           @unique
+  name            String
+  categoryId      String?
+  category        LabCategory?     @relation(fields: [categoryId], references: [id])
+  price           Float            @default(0)
+  sampleType      String?
+  description     String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  orderItems      LabOrderItem[]
+  referenceRanges ReferenceRange[]
+  results         LabResult[]
+}
+
+model LabOrder {
+  id          String         @id @default(cuid())
+  orderNo     String         @unique
+  patientId   String
+  patient     Patient        @relation(fields: [patientId], references: [id])
+  doctorId    String?
+  doctor      Doctor?        @relation(fields: [doctorId], references: [id])
+  totalAmount Float          @default(0)
+  status      String         @default("pending")
+  notes       String?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  items       LabOrderItem[]
+  samples     Sample[]
+  results     LabResult[]
+}
+
+model LabOrderItem {
+  id         String   @id @default(cuid())
+  labOrderId String
+  labOrder   LabOrder @relation(fields: [labOrderId], references: [id], onDelete: Cascade)
+  testId     String
+  test       LabTest  @relation(fields: [testId], references: [id])
+  price      Float    @default(0)
+  status     String   @default("pending")
+  createdAt  DateTime @default(now())
+}
+
+model Sample {
+  id          String    @id @default(cuid())
+  sampleNo    String    @unique
+  labOrderId  String
+  labOrder    LabOrder  @relation(fields: [labOrderId], references: [id], onDelete: Cascade)
+  sampleType  String
+  collectedAt DateTime?
+  status      String    @default("collected")
+  notes       String?
+  createdAt   DateTime  @default(now())
+}
+
+model LabResult {
+  id             String    @id @default(cuid())
+  labOrderId     String
+  labOrder       LabOrder  @relation(fields: [labOrderId], references: [id])
+  testId         String
+  test           LabTest   @relation(fields: [testId], references: [id])
+  parameterName  String
+  resultValue    String
+  unit           String?
+  referenceRange String?
+  status         String    @default("final")
+  notes          String?
+  testedAt       DateTime  @default(now())
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
+
+model ReferenceRange {
+  id            String   @id @default(cuid())
+  testId        String
+  test          LabTest  @relation(fields: [testId], references: [id], onDelete: Cascade)
+  parameterName String
+  gender        String?
+  ageMin        Int?
+  ageMax        Int?
+  lowerLimit    String?
+  upperLimit    String?
+  unit          String?
+  textRange     String?
+  createdAt     DateTime @default(now())
 }
