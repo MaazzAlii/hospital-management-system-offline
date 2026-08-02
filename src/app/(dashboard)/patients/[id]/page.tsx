@@ -13,7 +13,7 @@ import {
   Plus,
   Stethoscope,
 } from "lucide-react";
-import { createClient } from "@/lib/supabase/server";
+import { prisma } from "@/lib/prisma";
 import { getCurrentUserRole } from "@/lib/auth-utils";
 import { hasAccess } from "@/lib/permissions";
 
@@ -23,6 +23,7 @@ function computeAge(dobString: string): number {
   const ageDt = new Date(diffMs);
   return Math.abs(ageDt.getUTCFullYear() - 1970);
 }
+
 export const dynamic = "force-dynamic";
 
 function InfoRow({
@@ -53,61 +54,37 @@ export default async function PatientDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const supabase = await createClient();
 
-  // Fetch Patient
-  const { data: patient } = await supabase
-    .from("Patient")
-    .select("*")
-    .eq("id", id)
-    .single();
+  // Fetch Patient via Prisma
+  const patient = await prisma.patient.findUnique({
+    where: { id },
+  });
 
   if (!patient) notFound();
 
-  // Fetch Appointments
-  const { data: rawAppointments } = await supabase
-    .from("Appointment")
-    .select(`
-      id, scheduledAt, status,
-      Doctor ( id, userId, specialization )
-    `)
-    .eq("patientId", id)
-    .order("scheduledAt", { ascending: false })
-    .limit(5);
-
-  // Fetch doctors names for appointments
-  const apptDoctorUserIds = (rawAppointments || []).map((a: any) => {
-    const d = Array.isArray(a.Doctor) ? a.Doctor[0] : a.Doctor;
-    return d?.userId;
-  }).filter(Boolean);
-
-  let apptDoctorsMap: Record<string, string> = {};
-  if (apptDoctorUserIds.length > 0) {
-    const { data: users } = await supabase
-      .from("User")
-      .select("id, name")
-      .in("id", apptDoctorUserIds);
-    if (users) {
-      apptDoctorsMap = users.reduce((acc, u) => {
-        acc[u.id] = u.name;
-        return acc;
-      }, {} as Record<string, string>);
-    }
-  }
-
-  const appointments = (rawAppointments || []).map((a: any) => {
-    const d = Array.isArray(a.Doctor) ? a.Doctor[0] : a.Doctor;
-    const docName = d?.userId ? apptDoctorsMap[d.userId] : "Unknown";
-    return {
-      id: a.id,
-      scheduledAt: a.scheduledAt,
-      status: a.status,
+  // Fetch Appointments via Prisma
+  const rawAppointments = await prisma.appointment.findMany({
+    where: { patientId: id },
+    include: {
       doctor: {
-        specialization: d?.specialization,
-        user: { name: docName },
+        include: {
+          user: true,
+        },
       },
-    };
+    },
+    orderBy: { scheduledAt: "desc" },
+    take: 5,
   });
+
+  const appointments = rawAppointments.map((a) => ({
+    id: a.id,
+    scheduledAt: a.scheduledAt,
+    status: a.status,
+    doctor: {
+      specialization: a.doctor?.specialization,
+      user: { name: a.doctor?.user?.name ?? "Unknown" },
+    },
+  }));
 
   // Permission check for billing access
   const { role } = await getCurrentUserRole();
@@ -116,56 +93,42 @@ export default async function PatientDetailPage({
   // Fetch Invoices only if authorized
   let invoices: any[] | null = null;
   if (canReadBilling) {
-    const { data } = await supabase
-      .from("Invoice")
-      .select("id, invoiceNo, createdAt, total, status, sourceType")
-      .eq("patientId", id)
-      .order("createdAt", { ascending: false })
-      .limit(5);
-    invoices = data;
+    invoices = await prisma.invoice.findMany({
+      where: { patientId: id },
+      select: {
+        id: true,
+        invoiceNo: true,
+        createdAt: true,
+        total: true,
+        status: true,
+        sourceType: true,
+      },
+      orderBy: { createdAt: "desc" },
+      take: 5,
+    });
   }
 
-  // Fetch OPD Visits
-  const { data: rawOpdVisits } = await supabase
-    .from("OpdVisit")
-    .select(`
-      id, visitDate, diagnosis, status,
-      Doctor ( id, userId, specialization )
-    `)
-    .eq("patientId", id)
-    .order("visitDate", { ascending: false })
-    .limit(5);
-
-  const opdDoctorUserIds = (rawOpdVisits || []).map((o: any) => {
-    const d = Array.isArray(o.Doctor) ? o.Doctor[0] : o.Doctor;
-    return d?.userId;
-  }).filter(Boolean);
-
-  let opdDoctorsMap: Record<string, string> = {};
-  if (opdDoctorUserIds.length > 0) {
-    const { data: users } = await supabase
-      .from("User")
-      .select("id, name")
-      .in("id", opdDoctorUserIds);
-    if (users) {
-      opdDoctorsMap = users.reduce((acc, u) => {
-        acc[u.id] = u.name;
-        return acc;
-      }, {} as Record<string, string>);
-    }
-  }
-
-  const opdVisits = (rawOpdVisits || []).map((o: any) => {
-    const d = Array.isArray(o.Doctor) ? o.Doctor[0] : o.Doctor;
-    const docName = d?.userId ? opdDoctorsMap[d.userId] : "Unknown";
-    return {
-      id: o.id,
-      visitDate: o.visitDate,
-      diagnosis: o.diagnosis,
-      status: o.status,
-      doctor: { user: { name: docName } }
-    };
+  // Fetch OPD Visits via Prisma
+  const rawOpdVisits = await prisma.opdVisit.findMany({
+    where: { patientId: id },
+    include: {
+      doctor: {
+        include: {
+          user: true,
+        },
+      },
+    },
+    orderBy: { visitDate: "desc" },
+    take: 5,
   });
+
+  const opdVisits = rawOpdVisits.map((o) => ({
+    id: o.id,
+    visitDate: o.visitDate,
+    diagnosis: o.diagnosis,
+    status: o.status,
+    doctor: { user: { name: o.doctor?.user?.name ?? "Unknown" } },
+  }));
 
   const age = patient.dob ? computeAge(patient.dob) : "—";
   const dob = patient.dob
