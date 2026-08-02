@@ -101,8 +101,8 @@ export function SaleForm({ patients, medicines }: { patients: any[], medicines: 
     setIsLoading(true)
     
     try {
-      await createSale({
-        patientId: patientId === 'walk-in' ? null : patientId,
+      const res = await createSale({
+        patientId: patientId === 'walk-in' ? undefined : patientId,
         totalAmount,
         items: items.map(({ medicineId, quantity, outPrice }) => ({
           medicineId,
@@ -111,8 +111,13 @@ export function SaleForm({ patients, medicines }: { patients: any[], medicines: 
         }))
       })
       
-      router.push('/pharmacy/sales')
-      router.refresh()
+      if (res && res.success) {
+        router.push('/pharmacy/sales')
+        router.refresh()
+      } else {
+        setError(res?.error || 'Failed to create sale')
+        setIsLoading(false)
+      }
     } catch (err: any) {
       console.error(err)
       setError(err.message || 'Failed to create sale')
@@ -142,9 +147,14 @@ export function SaleForm({ patients, medicines }: { patients: any[], medicines: 
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="walk-in">Walk-in Patient (No Profile)</SelectItem>
-                  {patients.map(p => (
-                    <SelectItem key={p.id} value={p.id}>{p.firstName} {p.lastName} - {p.mrn}</SelectItem>
-                  ))}
+                  {patients.map(p => {
+                    const displayName = p.name || `${p.firstName || ''} ${p.lastName || ''}`.trim();
+                    return (
+                      <SelectItem key={p.id} value={p.id}>
+                        {displayName} {p.mrn ? `- ${p.mrn}` : ''}
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
             </div>
@@ -165,7 +175,7 @@ export function SaleForm({ patients, medicines }: { patients: any[], medicines: 
                   No items added yet. Click 'Add Item' to start.
                 </div>
               ) : (
-                items.map((item, index) => {
+                items.map((item) => {
                   const med = medicines.find(m => m.id === item.medicineId)
                   const isOverStock = med && item.quantity > med.currentStock
                   
