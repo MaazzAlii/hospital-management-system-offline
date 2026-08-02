@@ -1,6 +1,6 @@
 "use server";
 
-import { compare } from "bcrypt";
+import { compare, hash } from "bcrypt";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { getSession } from "@/lib/session";
@@ -86,11 +86,58 @@ export async function getCurrentUser() {
   if (!session.isLoggedIn || !session.userId) {
     return null;
   }
+
+  // Fetch fresh user data from database
+  const dbUser = await prisma.user.findUnique({
+    where: { id: session.userId },
+    include: { role: true },
+  });
+
   return {
     id: session.userId,
-    email: session.email,
-    name: session.name,
-    role: session.role,
+    email: dbUser?.email || session.email,
+    name: dbUser?.name || session.name,
+    role: dbUser?.role?.name || session.role,
     permissions: session.permissions,
   };
+}
+
+export async function updateProfile(data: {
+  name: string;
+  email: string;
+  password?: string;
+}) {
+  try {
+    const session = await getSession();
+    if (!session.isLoggedIn || !session.userId) {
+      return { success: false, error: "Unauthorized" };
+    }
+
+    const updateData: any = {
+      name: data.name,
+      email: data.email.trim().toLowerCase(),
+    };
+
+    if (data.password && data.password.trim().length > 0) {
+      updateData.passwordHash = await hash(data.password, 10);
+    }
+
+    const updatedUser = await prisma.user.update({
+      where: { id: session.userId },
+      data: updateData,
+    });
+
+    session.name = updatedUser.name;
+    session.email = updatedUser.email;
+    await session.save();
+
+    revalidatePath("/", "layout");
+    return { success: true, user: updatedUser };
+  } catch (error: unknown) {
+    console.error("Error updating profile:", error);
+    return {
+      success: false,
+      error: (error instanceof Error ? error.message : String(error)) || "Failed to update profile",
+    };
+  }
 }
