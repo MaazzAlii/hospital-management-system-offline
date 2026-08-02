@@ -73,6 +73,7 @@ export default function NewPatientPage() {
     setErrorMsg(null);
     const result = await createPatient(data);
     if (result.success) {
+      reset();
       router.push(`/patients/${result.patient?.id}`);
     } else {
       setErrorMsg(result.error || "Failed to create patient");
