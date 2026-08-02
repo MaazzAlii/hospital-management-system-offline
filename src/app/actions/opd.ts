@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { getCurrentUserRole, getCurrentDoctorId, hasAccess } from "@/lib/auth-utils";
+import { getErrorMessage } from "@/lib/error-utils";
 
 export async function createOpdVisit(data: {
   appointmentId?: string;
@@ -137,5 +138,43 @@ export async function getOpdVisitById(id: string) {
   } catch (error) {
     console.error("Failed to fetch OPD visit:", error);
     return null;
+  }
+}
+
+export async function updateOpdVisit(id: string, data: {
+  vitals?: {
+    bp?: string;
+    hr?: string;
+    temp?: string;
+    weight?: string;
+    height?: string;
+  };
+  symptoms?: string;
+  diagnosis?: string;
+  prescription?: any;
+}) {
+  try {
+    const { role } = await getCurrentUserRole();
+    if (!hasAccess(role, 'opd', 'write')) {
+      throw new Error('Unauthorized');
+    }
+
+    const visit = await prisma.opdVisit.update({
+      where: { id },
+      data: {
+        vitals: data.vitals || undefined,
+        symptoms: data.symptoms || null,
+        diagnosis: data.diagnosis || null,
+        prescription: data.prescription || null,
+      },
+    });
+
+    // Revalidate relevant pages
+    revalidatePath('/opd');
+    revalidatePath(`/opd/${id}`);
+    return { success: true, visit };
+  } catch (error: unknown) {
+    console.error('Failed to update OPD visit:', error);
+    return { success: false, error: getErrorMessage(error, 'Failed to update OPD visit') };
   }
 }

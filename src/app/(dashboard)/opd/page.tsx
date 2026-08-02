@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Plus, Search, FileText } from "lucide-react";
+import { Plus, Search, FileText, Edit } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserRole, getCurrentDoctorId } from "@/lib/auth-utils";
@@ -146,6 +146,12 @@ export default async function OpdVisitsPage({
                             <Button variant="ghost" size="sm" className="gap-2 text-primary hover:text-primary hover:bg-primary/10">
                               <FileText className="h-4 w-4" />
                               View
+                            </Button>
+                          </Link>
+                          <Link href={`/opd/${visit.id}/edit`}>
+                            <Button variant="ghost" size="sm" className="gap-2 text-primary hover:text-primary hover:bg-primary/10 ml-2">
+                              <Edit className="h-4 w-4" />
+                              Edit
                             </Button>
                           </Link>
                         </td>
