@@ -1,6 +1,6 @@
-import { createClient } from '@/lib/supabase/server';
+import { prisma } from './prisma';
 
-// Map sequence names to their PostgreSQL sequence identifiers
+// Map sequence names to their counter identifiers
 const SEQUENCES = {
   mrn: 'mrn_seq',
   invoice: 'invoice_seq',
@@ -11,21 +11,41 @@ const SEQUENCES = {
 } as const;
 
 /**
- * Get the next value from a PostgreSQL sequence atomically.
- * This is safe under high concurrency – no race conditions.
+ * Get the next value from the SQLite Counter table atomically via a Prisma transaction.
+ * This is safe under concurrency and prevents ID collision.
+ * If the transaction fails, throws an explicit error (no silent fallback).
  */
-async function getNextSequenceValue(seqName: string): Promise<number> {
-  const supabase = await createClient();
-  const { data, error } = await supabase.rpc('nextval', { seq_name: seqName });
-  
-  if (error || data === null || data === undefined) {
+export async function getNextSequenceValue(name: string): Promise<number> {
+  try {
+    const result = await prisma.$transaction(async (tx) => {
+      const counter = await tx.counter.upsert({
+        where: { name },
+        create: { name, value: 1 },
+        update: { value: { increment: 1 } },
+      });
+      return counter.value;
+    });
+    return result;
+  } catch (error: any) {
+    console.error(`[ID Generator] Error incrementing counter '${name}':`, error);
     throw new Error(
-      `Failed to generate ID sequence for '${seqName}' - please retry. ` +
-      (error?.message ? `(${error.message})` : 'No data returned from sequence RPC.')
+      `Failed to generate ID sequence for '${name}' - ${error?.message || error}`
     );
   }
-  
-  return Number(data);
+}
+
+/**
+ * Helper function to generate formatted sequential IDs using a prefix, current year, and padded sequence.
+ * e.g., generateSequentialId('mrn_seq', 'LCC', 4) => "LCC-2026-0001"
+ */
+export async function generateSequentialId(
+  modelName: string,
+  prefix: string,
+  padding: number = 4
+): Promise<string> {
+  const year = new Date().getFullYear();
+  const seq = await getNextSequenceValue(modelName);
+  return `${prefix}-${year}-${String(seq).padStart(padding, '0')}`;
 }
 
 /**
