@@ -1,25 +1,38 @@
-import { createClient } from "@/lib/supabase/server";
+import { getSession } from "@/lib/session";
+import { prisma } from "@/lib/prisma";
 
 export async function getCurrentUserRole(): Promise<{ user: any; role: string | null; roleData: any | null }> {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const session = await getSession();
 
-  if (!user) {
+  if (!session.isLoggedIn || !session.userId) {
     return { user: null, role: null, roleData: null };
   }
 
-  // Fetch the User record and its associated Role
-  const { data: userData } = await supabase
-    .from("User")
-    .select("*, Role(*)")
-    .eq("email", user.email)
-    .single();
+  // Fetch the User record and its associated Role via Prisma
+  const userData = await prisma.user.findUnique({
+    where: { id: session.userId },
+    include: {
+      role: {
+        include: {
+          rolePermissions: {
+            include: {
+              permission: true,
+            },
+          },
+        },
+      },
+    },
+  });
 
-  if (!userData || !userData.Role) {
-    return { user, role: null, roleData: null };
+  if (!userData || !userData.role) {
+    return { user: null, role: null, roleData: null };
   }
 
-  return { user, role: userData.Role.name, roleData: userData.Role };
+  return {
+    user: { id: userData.id, email: userData.email, name: userData.name },
+    role: userData.role.name,
+    roleData: userData.role,
+  };
 }
 
 export { hasAccess } from './permissions';
@@ -32,21 +45,10 @@ export async function getCurrentDoctorId(): Promise<string | null> {
   const { user, role } = await getCurrentUserRole();
   if (!user || !role || role.toLowerCase() !== 'doctor') return null;
 
-  const supabase = await createClient();
-  const { data: userData } = await supabase
-    .from("User")
-    .select("id")
-    .eq("email", user.email)
-    .maybeSingle();
-
-  if (!userData) return null;
-
-  const { data: doctor } = await supabase
-    .from("Doctor")
-    .select("id")
-    .eq("userId", userData.id)
-    .maybeSingle();
+  const doctor = await prisma.doctor.findUnique({
+    where: { userId: user.id },
+    select: { id: true },
+  });
 
   return doctor ? doctor.id : null;
 }
-
