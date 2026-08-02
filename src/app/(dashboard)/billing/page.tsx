@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Plus, Receipt } from "lucide-react";
-import { createClient } from "@/lib/supabase/server";
+import { prisma } from "@/lib/prisma";
+import { getCurrentUserRole } from "@/lib/auth-utils";
 import { Button } from "@/components/ui/button";
 export const dynamic = "force-dynamic";
 
@@ -71,37 +72,44 @@ export default async function BillingPage({
 }: {
   searchParams: Promise<{ q?: string }>;
 }) {
+  await getCurrentUserRole();
   const resolvedSearchParams = await searchParams;
   const query = resolvedSearchParams?.q || "";
-  const supabase = await createClient();
 
-  const { data: rawInvoices } = await supabase
-    .from("Invoice")
-    .select(`
-      id, invoiceNo, sourceType, total, status, createdAt, paymentMethod,
-      Patient ( id, name, mrn )
-    `)
-    .order("createdAt", { ascending: false });
-  
-  let invoices = (rawInvoices || []).map((i: any) => ({
+  const whereClause = query
+    ? {
+        OR: [
+          { invoiceNo: { contains: query } },
+          { patient: { name: { contains: query } } },
+          { patient: { mrn: { contains: query } } },
+        ],
+      }
+    : {};
+
+  const rawInvoices = await prisma.invoice.findMany({
+    where: whereClause,
+    include: {
+      patient: {
+        select: { id: true, name: true, mrn: true },
+      },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
+  const invoices = rawInvoices.map((i) => ({
     ...i,
-    patient: Array.isArray(i.Patient) ? i.Patient[0] : i.Patient,
+    patient: i.patient ? { id: i.patient.id, name: i.patient.name, mrn: i.patient.mrn } : { id: "", name: "Unknown", mrn: "—" },
   }));
 
-  if (query) {
-    const q = query.toLowerCase();
-    invoices = invoices.filter((i) => 
-      (i.invoiceNo || "").toLowerCase().includes(q) ||
-      (i.patient?.name || "").toLowerCase().includes(q) ||
-      (i.patient?.mrn || "").toLowerCase().includes(q)
-    );
-  }
+  const totalCount = await prisma.invoice.count();
+  const unpaidCount = await prisma.invoice.count({ where: { status: "unpaid" } });
 
-  const { count: totalCount } = await supabase.from("Invoice").select("*", { count: 'exact', head: true });
-  const { count: unpaidCount } = await supabase.from("Invoice").select("*", { count: 'exact', head: true }).eq('status', 'unpaid');
-  
-  const { data: revenueData } = await supabase.from("Invoice").select("total").in('status', ['paid', 'partial']);
-  const totalRevenue = (revenueData || []).reduce((sum, item) => sum + Number(item.total), 0);
+  const revenueAggregate = await prisma.invoice.aggregate({
+    _sum: { total: true },
+    where: { status: { in: ["paid", "partial"] } },
+  });
+
+  const totalRevenue = revenueAggregate._sum.total ?? 0;
 
   return (
     <div className="space-y-5">
