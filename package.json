@@ -1,6 +1,8 @@
 {
   "name": "hms",
   "version": "1.0.0",
+  "description": "Life Care Clinic HMS Desktop Application",
+  "author": "Life Care Clinic",
   "private": true,
   "main": "electron/main.js",
   "scripts": {
@@ -10,11 +12,12 @@
     "lint": "eslint",
     "electron:dev": "electron .",
     "electron:build": "next build && electron-builder --win",
-    "postinstall": "electron-rebuild"
+    "postinstall": "electron-builder install-app-deps"
   },
   "build": {
     "appId": "com.lifecare.hms",
     "productName": "Life Care HMS",
+    "npmRebuild": false,
     "directories": {
       "output": "dist"
     },
