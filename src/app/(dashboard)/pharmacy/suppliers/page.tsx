@@ -12,7 +12,7 @@ type SupplierRow = {
   phone: string | null;
   email: string | null;
   address: string | null;
-  isActive: boolean;
+  isActive?: boolean;
 };
 
 function SupplierTableRow({ supplier }: { supplier: SupplierRow }) {
@@ -33,10 +33,10 @@ function SupplierTableRow({ supplier }: { supplier: SupplierRow }) {
       <td className="px-4 py-3 text-sm">
         <span
           className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-            supplier.isActive ? "bg-success/10 text-success" : "bg-muted text-muted-foreground"
+            supplier.isActive !== false ? "bg-success/10 text-success" : "bg-muted text-muted-foreground"
           }`}
         >
-          {supplier.isActive ? "Active" : "Inactive"}
+          {supplier.isActive !== false ? "Active" : "Inactive"}
         </span>
       </td>
     </tr>
