@@ -8,12 +8,12 @@ export const dynamic = "force-dynamic";
 type InvoiceRow = {
   id: string;
   invoiceNo: string;
-  sourceType: string;
-  total: unknown;
+  sourceType: string | null;
+  total: number;
   status: string;
   createdAt: Date | string;
   patient: { id: string; name: string; mrn: string };
-  paymentMethod: string | null;
+  payments: { paymentMethod: string }[];
 };
 
 function InvoiceTableRow({ inv }: { inv: InvoiceRow }) {
@@ -34,7 +34,7 @@ function InvoiceTableRow({ inv }: { inv: InvoiceRow }) {
         </Link>
         <div className="text-xs text-muted-foreground font-mono">{inv.patient?.mrn || "—"}</div>
       </td>
-      <td className="px-4 py-3 text-sm text-muted-foreground">{inv.sourceType}</td>
+      <td className="px-4 py-3 text-sm text-muted-foreground">{inv.sourceType || "Standard"}</td>
       <td className="px-4 py-3 text-sm font-semibold">
         Rs. {Number(inv.total).toLocaleString()}
       </td>
@@ -92,13 +92,22 @@ export default async function BillingPage({
       patient: {
         select: { id: true, name: true, mrn: true },
       },
+      payments: {
+        select: { paymentMethod: true },
+      },
     },
     orderBy: { createdAt: "desc" },
   });
 
-  const invoices = rawInvoices.map((i) => ({
-    ...i,
+  const invoices: InvoiceRow[] = rawInvoices.map((i) => ({
+    id: i.id,
+    invoiceNo: i.invoiceNo,
+    sourceType: i.sourceType,
+    total: i.total,
+    status: i.status,
+    createdAt: i.createdAt,
     patient: i.patient ? { id: i.patient.id, name: i.patient.name, mrn: i.patient.mrn } : { id: "", name: "Unknown", mrn: "—" },
+    payments: i.payments,
   }));
 
   const totalCount = await prisma.invoice.count();
@@ -201,7 +210,7 @@ export default async function BillingPage({
             <tbody>
               {invoices.length > 0 ? (
                 invoices.map((inv) => (
-                  <InvoiceTableRow key={inv.id} inv={inv as InvoiceRow} />
+                  <InvoiceTableRow key={inv.id} inv={inv} />
                 ))
               ) : (
                 <tr>
