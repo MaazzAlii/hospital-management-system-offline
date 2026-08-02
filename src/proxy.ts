@@ -50,9 +50,11 @@ export async function proxy(request: NextRequest) {
     else if (pathname.startsWith("/settings")) module = "settings";
 
     if (!hasAccess(roleName, module, "read")) {
-      const url = request.nextUrl.clone();
-      url.pathname = "/dashboard";
-      return NextResponse.redirect(url);
+      if (pathname !== "/dashboard") {
+        const url = request.nextUrl.clone();
+        url.pathname = "/dashboard";
+        return NextResponse.redirect(url);
+      }
     }
   }
 
