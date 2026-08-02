@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Search, Plus, Eye, Pencil } from "lucide-react";
-import { createClient } from "@/lib/supabase/server";
+import { prisma } from "@/lib/prisma";
+import { getCurrentUserRole } from "@/lib/auth-utils";
 import { Button } from "@/components/ui/button";
 import { computeAge } from "@/lib/utils";
 
@@ -60,24 +61,27 @@ export default async function PatientsPage({
 }: {
   searchParams: Promise<{ q?: string }>;
 }) {
+  await getCurrentUserRole();
+
   const resolvedSearchParams = await searchParams;
   const query = resolvedSearchParams?.q || "";
-  const supabase = await createClient();
 
-  let queryBuilder = supabase
-    .from("Patient")
-    .select("*")
-    .order("createdAt", { ascending: false });
+  const whereClause = query
+    ? {
+        OR: [
+          { name: { contains: query } },
+          { mrn: { contains: query } },
+          { phone: { contains: query } },
+        ],
+      }
+    : {};
 
-  if (query) {
-    queryBuilder = queryBuilder.or(`name.ilike.%${query}%,mrn.ilike.%${query}%,phone.ilike.%${query}%`);
-  }
+  const patients = await prisma.patient.findMany({
+    where: whereClause,
+    orderBy: { createdAt: "desc" },
+  });
 
-  const { data: patients } = await queryBuilder;
-
-  const { count: totalCount } = await supabase
-    .from("Patient")
-    .select("*", { count: "exact", head: true });
+  const totalCount = await prisma.patient.count();
 
   return (
     <div className="space-y-5">
