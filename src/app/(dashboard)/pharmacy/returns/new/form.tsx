@@ -1,3 +1,5 @@
+'use server'
+
 'use client'
 
 import { useState } from 'react'
@@ -45,7 +47,7 @@ export function ReturnForm() {
         setItems([])
       } else {
         setSaleData(data)
-        const saleItems = data.items || data.SaleItem || [];
+        const saleItems = (data as any).items || (data as any).SaleItem || [];
         setItems(saleItems.map((item: any) => ({
           ...item,
           returnQuantity: 0,
