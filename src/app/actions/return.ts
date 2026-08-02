@@ -1,31 +1,27 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { prisma } from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
 import { getCurrentUserRole, hasAccess } from '@/lib/auth-utils'
 
 export async function getSaleBySaleNo(saleNo: string) {
-  const supabase = await createClient()
-
-  const { data, error } = await supabase
-    .from('Sale')
-    .select(`
-      *,
-      Patient:patientId (*),
-      SaleItem (
-        *,
-        Medicine:medicineId (*)
-      )
-    `)
-    .eq('saleNo', saleNo)
-    .single()
-
-  if (error) {
-    console.error('Error fetching sale:', error)
-    return null
+  try {
+    const sale = await prisma.sale.findUnique({
+      where: { saleNo },
+      include: {
+        patient: true,
+        items: {
+          include: {
+            medicine: true,
+          },
+        },
+      },
+    });
+    return sale;
+  } catch (error) {
+    console.error('Error fetching sale by saleNo:', error);
+    return null;
   }
-
-  return data
 }
 
 export async function processReturn(saleId: string, itemsToReturn: any[]) {
@@ -34,51 +30,42 @@ export async function processReturn(saleId: string, itemsToReturn: any[]) {
     throw new Error('Unauthorized');
   }
 
-  const supabase = await createClient()
+  const sale = await prisma.sale.findUnique({
+    where: { id: saleId },
+    select: { saleNo: true },
+  });
 
-  // Verify the sale exists
-  const { data: sale, error: saleError } = await supabase
-    .from('Sale')
-    .select('saleNo')
-    .eq('id', saleId)
-    .single()
-
-  if (saleError || !sale) {
-    throw new Error('Sale not found')
+  if (!sale) {
+    throw new Error('Sale not found');
   }
 
-  // Filter out items with 0 return quantity
-  const validItems = itemsToReturn.filter(item => item.returnQuantity > 0)
-  
+  const validItems = itemsToReturn.filter((item) => item.returnQuantity > 0);
+
   if (validItems.length === 0) {
-    throw new Error('No items to return')
+    throw new Error('No items to return');
   }
 
-  // Create StockMovements for each returned item
-  const movementsToInsert = validItems.map(item => ({
-    medicineId: item.medicineId,
-    type: 'return',
-    quantity: item.returnQuantity, // Positive for returns (stock goes back in)
-    referenceId: saleId,
-    notes: `Return against Sale ${sale.saleNo} - Reason: ${item.reason || 'N/A'}`
-  }))
+  await prisma.$transaction(async (tx) => {
+    for (const item of validItems) {
+      await tx.stockMovement.create({
+        data: {
+          medicineId: item.medicineId,
+          type: 'return',
+          quantity: Math.abs(item.returnQuantity),
+          referenceType: 'Sale',
+          referenceId: saleId,
+          notes: `Return against Sale ${sale.saleNo} - Reason: ${item.reason || 'N/A'}`,
+        },
+      });
+    }
 
-  const { error: movementsError } = await supabase
-    .from('StockMovement')
-    .insert(movementsToInsert)
+    await tx.sale.update({
+      where: { id: saleId },
+      data: { status: 'returned' },
+    });
+  });
 
-  if (movementsError) {
-    console.error('Error creating stock movements for return:', movementsError)
-    throw new Error('Failed to process return stock movements')
-  }
-
-  // Update sale status to 'returned' or 'partially_returned' (optional depending on requirement, let's say 'returned' for simplicity if we return anything, or leave it)
-  await supabase
-    .from('Sale')
-    .update({ status: 'returned' })
-    .eq('id', saleId)
-
-  revalidatePath('/pharmacy/sales')
-  revalidatePath('/pharmacy/medicines')
-  return { success: true }
+  revalidatePath('/pharmacy/sales');
+  revalidatePath('/pharmacy/medicines');
+  return { success: true };
 }
