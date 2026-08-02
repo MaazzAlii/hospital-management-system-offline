@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Plus } from "lucide-react";
-import { createClient } from "@/lib/supabase/server";
+import { prisma } from "@/lib/prisma";
+import { getCurrentUserRole } from "@/lib/auth-utils";
 import { Button } from "@/components/ui/button";
 
 export const dynamic = "force-dynamic";
@@ -82,74 +83,54 @@ export default async function AppointmentsPage({
 }: {
   searchParams: Promise<{ q?: string }>;
 }) {
+  await getCurrentUserRole();
+
   const resolvedSearchParams = await searchParams;
   const query = resolvedSearchParams?.q || "";
-  const supabase = await createClient();
 
-  const { data: rawAppointments } = await supabase
-    .from("Appointment")
-    .select(`
-      id,
-      scheduledAt,
-      status,
-      notes,
-      Patient ( id, mrn, name ),
-      Doctor ( id, userId, specialization )
-    `)
-    .order("scheduledAt", { ascending: false });
-
-  // Fetch users separately to attach to doctors
-  let usersMap: Record<string, string> = {};
-  if (rawAppointments && rawAppointments.length > 0) {
-    const userIds = rawAppointments
-      .map((a: any) => {
-        const d = Array.isArray(a.Doctor) ? a.Doctor[0] : a.Doctor;
-        return d?.userId;
-      })
-      .filter(Boolean);
-
-    if (userIds.length > 0) {
-      const { data: usersData } = await supabase
-        .from("User")
-        .select("id, name")
-        .in("id", userIds);
-
-      if (usersData) {
-        usersMap = usersData.reduce((acc, u) => {
-          acc[u.id] = u.name;
-          return acc;
-        }, {} as Record<string, string>);
+  const whereClause = query
+    ? {
+        OR: [
+          { patient: { name: { contains: query } } },
+          { patient: { mrn: { contains: query } } },
+          { doctor: { user: { name: { contains: query } } } },
+        ],
       }
-    }
-  }
+    : {};
 
-  let appointments: ApptRow[] = (rawAppointments || []).map((a: any) => {
-    const p = Array.isArray(a.Patient) ? a.Patient[0] : a.Patient;
-    const d = Array.isArray(a.Doctor) ? a.Doctor[0] : a.Doctor;
-    const uName = d?.userId ? usersMap[d.userId] : "Unknown";
-    
-    return {
-      id: a.id,
-      scheduledAt: new Date(a.scheduledAt),
-      status: a.status,
-      notes: a.notes,
-      patient: { id: p?.id, mrn: p?.mrn, name: p?.name },
-      doctor: { id: d?.id, specialization: d?.specialization, user: { name: uName || "Unknown" } }
-    };
+  const rawAppointments = await prisma.appointment.findMany({
+    where: whereClause,
+    include: {
+      patient: true,
+      doctor: {
+        include: {
+          user: true,
+        },
+      },
+    },
+    orderBy: {
+      scheduledAt: "desc",
+    },
   });
 
-  if (query) {
-    const q = query.toLowerCase();
-    appointments = appointments.filter((a) =>
-      (a.patient?.name || "").toLowerCase().includes(q) ||
-      (a.patient?.mrn || "").toLowerCase().includes(q) ||
-      (a.doctor?.user?.name || "").toLowerCase().includes(q)
-    );
-  }
+  const totalCount = await prisma.appointment.count();
 
-  const { count: totalCount } = await supabase
-    .from("Appointment")
-    .select("*", { count: "exact", head: true });
+  const appointments: ApptRow[] = rawAppointments.map((a) => ({
+    id: a.id,
+    scheduledAt: a.scheduledAt,
+    status: a.status,
+    notes: a.notes,
+    patient: {
+      id: a.patient?.id ?? "",
+      mrn: a.patient?.mrn ?? "",
+      name: a.patient?.name ?? "Unknown",
+    },
+    doctor: {
+      id: a.doctor?.id ?? "",
+      specialization: a.doctor?.specialization ?? null,
+      user: { name: a.doctor?.user?.name ?? "Unknown" },
+    },
+  }));
 
   return (
     <div className="space-y-5">
@@ -223,7 +204,7 @@ export default async function AppointmentsPage({
               ) : (
                 <tr>
                   <td
-                    colSpan={5}
+                    colSpan={6}
                     className="px-4 py-12 text-center text-sm text-muted-foreground"
                   >
                     {query
