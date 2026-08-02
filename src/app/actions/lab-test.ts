@@ -1,62 +1,52 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { prisma } from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
 import { getCurrentUserRole, hasAccess } from '@/lib/auth-utils'
 
 export async function getLabTests(query?: string) {
-  const { role } = await getCurrentUserRole();
-  if (!hasAccess(role, 'lab', 'read')) {
-    throw new Error('Unauthorized to view lab tests');
+  try {
+    const { role } = await getCurrentUserRole();
+    if (!hasAccess(role, 'lab', 'read')) {
+      throw new Error('Unauthorized to view lab tests');
+    }
+
+    let whereClause: any = {};
+    if (query) {
+      whereClause.OR = [
+        { name: { contains: query } },
+        { code: { contains: query } },
+        { category: { name: { contains: query } } },
+      ];
+    }
+
+    return await prisma.labTest.findMany({
+      where: whereClause,
+      include: {
+        category: true,
+      },
+      orderBy: { name: 'asc' },
+    });
+  } catch (error) {
+    console.error('Error fetching lab tests:', error);
+    return [];
   }
-
-  const supabase = await createClient()
-
-  let request = supabase
-    .from('LabTest')
-    .select(`
-      *,
-      LabCategory:categoryId (id, name)
-    `)
-    .order('name', { ascending: true })
-
-  const { data, error } = await request
-
-  if (error) {
-    console.error('Error fetching lab tests:', error)
-    return []
-  }
-
-  let tests = data || []
-  if (query) {
-    const q = query.toLowerCase()
-    tests = tests.filter((t: any) => 
-      t.name?.toLowerCase().includes(q) ||
-      t.code?.toLowerCase().includes(q) ||
-      t.LabCategory?.name?.toLowerCase().includes(q)
-    )
-  }
-
-  return tests
 }
 
 export async function getLabCategories() {
-  const { role } = await getCurrentUserRole();
-  if (!hasAccess(role, 'lab', 'read')) {
-    throw new Error('Unauthorized to view lab categories');
-  }
+  try {
+    const { role } = await getCurrentUserRole();
+    if (!hasAccess(role, 'lab', 'read')) {
+      throw new Error('Unauthorized to view lab categories');
+    }
 
-  const supabase = await createClient()
-  const { data, error } = await supabase
-    .from('LabCategory')
-    .select('*')
-    .order('name', { ascending: true })
-
-  if (error) {
-    console.error('Error fetching lab categories:', error)
-    return []
+    return await prisma.labCategory.findMany({
+      orderBy: { name: 'asc' },
+    });
+  } catch (error) {
+    console.error('Error fetching lab categories:', error);
+    return [];
   }
-  return data || []
 }
 
 export async function createLabCategory(name: string) {
@@ -65,46 +55,37 @@ export async function createLabCategory(name: string) {
     throw new Error('Unauthorized');
   }
 
-  const supabase = await createClient()
-  const { data, error } = await supabase
-    .from('LabCategory')
-    .insert({ name })
-    .select()
-    .single()
-
-  if (error) {
-    throw new Error('Failed to create category')
-  }
-  return data
+  const category = await prisma.labCategory.create({
+    data: { name },
+  });
+  return category;
 }
 
-export async function createLabTest(data: any) {
+export async function createLabTest(data: {
+  name: string;
+  categoryId?: string;
+  code: string;
+  price: number;
+  sampleType?: string;
+  description?: string;
+}) {
   const { role } = await getCurrentUserRole();
   if (!hasAccess(role, 'lab', 'write')) {
     throw new Error('Unauthorized');
   }
 
-  const supabase = await createClient()
-
-  const { data: test, error } = await supabase
-    .from('LabTest')
-    .insert({
+  const test = await prisma.labTest.create({
+    data: {
       name: data.name,
-      categoryId: data.categoryId,
+      categoryId: data.categoryId || null,
       code: data.code,
       price: data.price,
-      sampleType: data.sampleType,
-      turnaroundHours: data.turnaroundHours,
-      isActive: data.isActive ?? true
-    })
-    .select()
-    .single()
+      sampleType: data.sampleType || null,
+      description: data.description || null,
+    },
+  });
 
-  if (error) {
-    console.error('Error creating lab test:', error)
-    throw new Error('Failed to create lab test')
-  }
-
-  revalidatePath('/lab/tests')
-  return test
+  revalidatePath('/lab/tests');
+  revalidatePath('/lab-tests');
+  return test;
 }
