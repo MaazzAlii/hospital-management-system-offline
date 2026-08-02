@@ -6,7 +6,6 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/componen
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
 import { ArrowLeft, Search } from 'lucide-react'
 import { getSaleBySaleNo, processReturn } from '@/app/actions/return'
 import Link from 'next/link'
@@ -14,10 +13,12 @@ import Link from 'next/link'
 type SaleItem = {
   id: string;
   medicineId: string;
+  medicine?: { name: string };
   Medicine?: { name: string };
   quantity: number;
-  outPrice: number;
-  total: number;
+  unitPrice?: number;
+  outPrice?: number;
+  totalPrice?: number;
   // UI state
   returnQuantity: number;
   reason: string;
@@ -44,7 +45,8 @@ export function ReturnForm() {
         setItems([])
       } else {
         setSaleData(data)
-        setItems(data.SaleItem.map((item: any) => ({
+        const saleItems = data.items || data.SaleItem || [];
+        setItems(saleItems.map((item: any) => ({
           ...item,
           returnQuantity: 0,
           reason: ''
@@ -78,8 +80,9 @@ export function ReturnForm() {
     }
     
     for (const item of itemsToReturn) {
+      const medName = item.medicine?.name || item.Medicine?.name || "Medicine";
       if (item.returnQuantity > item.quantity) {
-        setError(`Return quantity for ${item.Medicine?.name} cannot exceed sold quantity (${item.quantity})`)
+        setError(`Return quantity for ${medName} cannot exceed sold quantity (${item.quantity})`)
         return
       }
     }
@@ -117,7 +120,7 @@ export function ReturnForm() {
                 id="saleNo" 
                 value={saleNo}
                 onChange={e => setSaleNo(e.target.value)}
-                placeholder="e.g. SALE-1734500000000"
+                placeholder="e.g. SALE-2026-0001"
               />
             </div>
             <Button type="button" onClick={searchSale} disabled={isLoading || !saleNo}>
@@ -129,42 +132,46 @@ export function ReturnForm() {
           {saleData && (
             <div className="space-y-4 pt-4 border-t">
               <div className="flex items-center justify-between text-sm text-muted-foreground">
-                <span><strong>Patient:</strong> {saleData.Patient ? `${saleData.Patient.firstName} ${saleData.Patient.lastName}` : 'Walk-in'}</span>
+                <span><strong>Patient:</strong> {saleData.patient?.name || saleData.customerName || 'Walk-in'}</span>
                 <span><strong>Date:</strong> {new Date(saleData.createdAt).toLocaleDateString()}</span>
                 <span><strong>Total:</strong> Rs {saleData.totalAmount?.toFixed(2)}</span>
               </div>
               
               <div className="rounded-md border divide-y">
-                {items.map((item) => (
-                  <div key={item.id} className="p-4 grid gap-4 sm:grid-cols-12 items-start bg-muted/20">
-                    <div className="sm:col-span-4 space-y-1">
-                      <Label className="text-xs text-muted-foreground">Medicine</Label>
-                      <div className="font-medium">{item.Medicine?.name}</div>
-                      <div className="text-xs text-muted-foreground">Sold: {item.quantity} | Price: Rs {item.outPrice}</div>
+                {items.map((item) => {
+                  const medName = item.medicine?.name || item.Medicine?.name || "Medicine";
+                  const price = item.unitPrice ?? item.outPrice ?? 0;
+                  return (
+                    <div key={item.id} className="p-4 grid gap-4 sm:grid-cols-12 items-start bg-muted/20">
+                      <div className="sm:col-span-4 space-y-1">
+                        <Label className="text-xs text-muted-foreground">Medicine</Label>
+                        <div className="font-medium">{medName}</div>
+                        <div className="text-xs text-muted-foreground">Sold: {item.quantity} | Price: Rs {price}</div>
+                      </div>
+                      
+                      <div className="sm:col-span-3 space-y-2">
+                        <Label className="text-xs text-muted-foreground">Return Qty</Label>
+                        <Input 
+                          type="number" 
+                          min="0" 
+                          max={item.quantity}
+                          value={item.returnQuantity} 
+                          onChange={e => updateItem(item.id, 'returnQuantity', Number(e.target.value))} 
+                        />
+                      </div>
+                      
+                      <div className="sm:col-span-5 space-y-2">
+                        <Label className="text-xs text-muted-foreground">Reason</Label>
+                        <Input 
+                          placeholder="e.g. Expired, damaged"
+                          value={item.reason} 
+                          onChange={e => updateItem(item.id, 'reason', e.target.value)} 
+                          disabled={item.returnQuantity === 0}
+                        />
+                      </div>
                     </div>
-                    
-                    <div className="sm:col-span-3 space-y-2">
-                      <Label className="text-xs text-muted-foreground">Return Qty</Label>
-                      <Input 
-                        type="number" 
-                        min="0" 
-                        max={item.quantity}
-                        value={item.returnQuantity} 
-                        onChange={e => updateItem(item.id, 'returnQuantity', Number(e.target.value))} 
-                      />
-                    </div>
-                    
-                    <div className="sm:col-span-5 space-y-2">
-                      <Label className="text-xs text-muted-foreground">Reason</Label>
-                      <Input 
-                        placeholder="e.g. Expired, damaged"
-                        value={item.reason} 
-                        onChange={e => updateItem(item.id, 'reason', e.target.value)} 
-                        disabled={item.returnQuantity === 0}
-                      />
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
