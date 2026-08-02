@@ -14,6 +14,8 @@ import {
   Stethoscope,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { getCurrentUserRole } from "@/lib/auth-utils";
+import { hasAccess } from "@/lib/permissions";
 
 function computeAge(dobString: string): number {
   const dob = new Date(dobString);
@@ -107,13 +109,21 @@ export default async function PatientDetailPage({
     };
   });
 
-  // Fetch Invoices
-  const { data: invoices } = await supabase
-    .from("Invoice")
-    .select("id, invoiceNo, createdAt, total, status, sourceType")
-    .eq("patientId", id)
-    .order("createdAt", { ascending: false })
-    .limit(5);
+  // Permission check for billing access
+  const { role } = await getCurrentUserRole();
+  const canReadBilling = role ? hasAccess(role, "billing", "read") : false;
+
+  // Fetch Invoices only if authorized
+  let invoices: any[] | null = null;
+  if (canReadBilling) {
+    const { data } = await supabase
+      .from("Invoice")
+      .select("id, invoiceNo, createdAt, total, status, sourceType")
+      .eq("patientId", id)
+      .order("createdAt", { ascending: false })
+      .limit(5);
+    invoices = data;
+  }
 
   // Fetch OPD Visits
   const { data: rawOpdVisits } = await supabase
@@ -313,47 +323,49 @@ export default async function PatientDetailPage({
         </div>
 
         {/* Invoices */}
-        <div className="rounded-xl border bg-card p-5 shadow-sm">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <Receipt className="h-4 w-4 text-primary" />
-              <h2 className="text-sm font-semibold">Recent Invoices</h2>
+        {canReadBilling && (
+          <div className="rounded-xl border bg-card p-5 shadow-sm">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <Receipt className="h-4 w-4 text-primary" />
+                <h2 className="text-sm font-semibold">Recent Invoices</h2>
+              </div>
+              <Link href={`/billing/new?patientId=${patient.id}`}>
+                <Button variant="ghost" size="sm" className="h-8 gap-1 px-2 text-xs">
+                  <Plus className="h-3.5 w-3.5" />
+                  New Invoice
+                </Button>
+              </Link>
             </div>
-            <Link href={`/billing/new?patientId=${patient.id}`}>
-              <Button variant="ghost" size="sm" className="h-8 gap-1 px-2 text-xs">
-                <Plus className="h-3.5 w-3.5" />
-                New Invoice
-              </Button>
-            </Link>
-          </div>
 
-          {(invoices || []).length > 0 ? (
-            <div className="space-y-3">
-              {invoices!.map((inv: any) => (
-                <Link key={inv.id} href={`/billing/${inv.id}`}>
-                  <div className="flex items-center justify-between border-b pb-3 last:border-0 last:pb-0 hover:bg-muted/30 transition-colors p-2 rounded-md -mx-2 cursor-pointer">
-                    <div>
-                      <p className="text-sm font-medium font-mono text-primary">{inv.invoiceNo}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {new Date(inv.createdAt).toLocaleDateString("en-PK", { month: "short", day: "numeric", year: "numeric" })} • {inv.sourceType}
-                      </p>
+            {(invoices || []).length > 0 ? (
+              <div className="space-y-3">
+                {invoices!.map((inv: any) => (
+                  <Link key={inv.id} href={`/billing/${inv.id}`}>
+                    <div className="flex items-center justify-between border-b pb-3 last:border-0 last:pb-0 hover:bg-muted/30 transition-colors p-2 rounded-md -mx-2 cursor-pointer">
+                      <div>
+                        <p className="text-sm font-medium font-mono text-primary">{inv.invoiceNo}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {new Date(inv.createdAt).toLocaleDateString("en-PK", { month: "short", day: "numeric", year: "numeric" })} • {inv.sourceType}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-semibold">Rs. {Number(inv.total).toLocaleString()}</p>
+                        <span className={`inline-block mt-0.5 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${invoiceColors[inv.status] || "bg-muted"}`}>
+                          {inv.status}
+                        </span>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <p className="text-sm font-semibold">Rs. {Number(inv.total).toLocaleString()}</p>
-                      <span className={`inline-block mt-0.5 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${invoiceColors[inv.status] || "bg-muted"}`}>
-                        {inv.status}
-                      </span>
-                    </div>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center py-6 text-center">
-              <p className="text-sm text-muted-foreground">No invoices generated yet.</p>
-            </div>
-          )}
-        </div>
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-6 text-center">
+                <p className="text-sm text-muted-foreground">No invoices generated yet.</p>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* OPD Visits */}
         <div className="rounded-xl border bg-card p-5 shadow-sm">
