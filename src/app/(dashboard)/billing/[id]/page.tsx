@@ -45,6 +45,8 @@ export default async function InvoiceDetailPage({
     partial: "bg-warning/10 text-warning border-warning/30",
   };
 
+  const firstPaymentMethod = invoice.payments?.[0]?.paymentMethod;
+
   return (
     <div className="space-y-4">
       {/* Toolbar */}
@@ -110,7 +112,7 @@ export default async function InvoiceDetailPage({
         <div className="mb-6">
           <p className="text-xs text-muted-foreground">
             Visit Type:{" "}
-            <span className="font-medium text-foreground">{invoice.sourceType}</span>
+            <span className="font-medium text-foreground">{invoice.sourceType || "Standard"}</span>
           </p>
         </div>
 
@@ -147,7 +149,7 @@ export default async function InvoiceDetailPage({
                     Rs. {Number(item.unitPrice).toLocaleString()}
                   </td>
                   <td className="px-4 py-3 text-sm text-right font-medium">
-                    Rs. {Number(item.total).toLocaleString()}
+                    Rs. {Number(item.amount).toLocaleString()}
                   </td>
                 </tr>
               ))}
@@ -164,7 +166,7 @@ export default async function InvoiceDetailPage({
             </div>
             {discountAmt > 0 && (
               <div className="flex justify-between text-destructive">
-                <span>Discount ({Number(invoice.aoDiscountPct)}%)</span>
+                <span>Discount ({Number(invoice.discountValue ?? 0)}%)</span>
                 <span>− Rs. {discountAmt.toLocaleString()}</span>
               </div>
             )}
@@ -172,9 +174,9 @@ export default async function InvoiceDetailPage({
               <span>Total</span>
               <span>Rs. {total.toLocaleString()}</span>
             </div>
-            {invoice.paymentMethod && (
+            {firstPaymentMethod && (
               <div className="flex justify-between text-success text-xs">
-                <span>Paid via {invoice.paymentMethod}</span>
+                <span>Paid via {firstPaymentMethod}</span>
                 <span>Rs. {total.toLocaleString()}</span>
               </div>
             )}
@@ -195,8 +197,8 @@ export default async function InvoiceDetailPage({
                 >
                   <span className="text-muted-foreground">
                     {new Date(pmt.paidAt).toLocaleDateString("en-PK")} ·{" "}
-                    {pmt.method}
-                    {pmt.note && ` · ${pmt.note}`}
+                    {pmt.paymentMethod}
+                    {pmt.notes && ` · ${pmt.notes}`}
                   </span>
                   <span className="font-medium text-success">
                     Rs. {Number(pmt.amount).toLocaleString()}
