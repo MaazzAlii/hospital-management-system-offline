@@ -1,21 +1,69 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
+import { compare } from "bcrypt";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { getSession } from "@/lib/session";
+import { prisma } from "@/lib/prisma";
 
-export async function login(formData: FormData) {
-  const email = formData.get("email") as string;
-  const password = formData.get("password") as string;
+export async function login(prevState: any, formData?: FormData) {
+  // Support both (formData) and (prevState, formData) signatures
+  let email = "";
+  let password = "";
 
-  const supabase = await createClient();
-  const { error } = await supabase.auth.signInWithPassword({
-    email,
-    password,
-  });
+  if (formData instanceof FormData) {
+    email = (formData.get("email") as string) || "";
+    password = (formData.get("password") as string) || "";
+  } else if (prevState instanceof FormData) {
+    email = (prevState.get("email") as string) || "";
+    password = (prevState.get("password") as string) || "";
+  } else if (typeof prevState === "object" && prevState !== null) {
+    email = prevState.email || "";
+    password = prevState.password || "";
+  }
 
-  if (error) {
-    return { error: (error instanceof Error ? error.message : String(error)) };
+  if (!email || !password) {
+    return { error: "Email and password are required." };
+  }
+
+  try {
+    const user = await prisma.user.findUnique({
+      where: { email: email.trim().toLowerCase() },
+      include: {
+        role: {
+          include: {
+            rolePermissions: {
+              include: {
+                permission: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!user || !user.passwordHash) {
+      return { error: "Invalid email or password." };
+    }
+
+    const isPasswordValid = await compare(password, user.passwordHash);
+    if (!isPasswordValid) {
+      return { error: "Invalid email or password." };
+    }
+
+    const session = await getSession();
+    session.userId = user.id;
+    session.email = user.email;
+    session.name = user.name;
+    session.role = user.role?.name || "User";
+    session.permissions = user.role?.rolePermissions.map(
+      (rp) => `${rp.permission.module}:${rp.permission.action}`
+    ) || [];
+    session.isLoggedIn = true;
+    await session.save();
+  } catch (error: any) {
+    console.error("Login error:", error);
+    return { error: "An unexpected error occurred during login." };
   }
 
   revalidatePath("/", "layout");
@@ -24,14 +72,25 @@ export async function login(formData: FormData) {
 
 export async function logout() {
   try {
-    const supabase = await createClient();
-    const { error } = await supabase.auth.signOut({ scope: "local" });
-    if (error) {
-      console.error("Supabase signOut error:", error);
-    }
+    const session = await getSession();
+    session.destroy();
   } catch (err: unknown) {
     console.error("Exception during logout:", err);
   }
   revalidatePath("/", "layout");
   redirect("/login");
+}
+
+export async function getCurrentUser() {
+  const session = await getSession();
+  if (!session.isLoggedIn || !session.userId) {
+    return null;
+  }
+  return {
+    id: session.userId,
+    email: session.email,
+    name: session.name,
+    role: session.role,
+    permissions: session.permissions,
+  };
 }
