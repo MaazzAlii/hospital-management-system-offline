@@ -17,18 +17,11 @@
   "build": {
     "appId": "com.lifecare.hms",
     "productName": "Life Care HMS",
-    "npmRebuild": false,
     "directories": {
       "output": "dist"
     },
     "files": [
-      "electron/**/*",
-      ".next/**/*",
-      "public/**/*",
-      "node_modules/**/*",
-      "package.json",
-      "prisma/**/*",
-      "hms.db"
+      "**/*"
     ],
     "win": {
       "target": "nsis"
