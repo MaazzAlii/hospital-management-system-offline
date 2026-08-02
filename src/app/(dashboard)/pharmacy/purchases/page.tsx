@@ -43,7 +43,7 @@ export default async function PurchasesPage() {
                 purchases?.map((purchase: any) => (
                   <div key={purchase.id} className="grid grid-cols-5 items-center p-4">
                     <div className="font-medium">{purchase.purchaseNo}</div>
-                    <div>{purchase.Supplier?.name || 'Unknown'}</div>
+                    <div>{purchase.supplier?.name || purchase.Supplier?.name || 'Unknown'}</div>
                     <div>{new Date(purchase.createdAt || new Date()).toLocaleDateString()}</div>
                     <div>Rs {purchase.totalAmount?.toFixed(2)}</div>
                     <div>
