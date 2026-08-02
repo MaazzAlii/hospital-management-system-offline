@@ -40,29 +40,36 @@ export default async function SalesPage() {
                   No sales found
                 </div>
               ) : (
-                sales?.map((sale: any) => (
-                  <div key={sale.id} className="grid grid-cols-5 items-center p-4">
-                    <div className="font-medium">{sale.saleNo}</div>
-                    <div>
-                      {sale.Patient ? (
-                        <span>
-                          {sale.Patient.firstName} {sale.Patient.lastName}
+                sales?.map((sale: any) => {
+                  const patientName =
+                    sale.patient?.name ||
+                    (sale.patient?.firstName ? `${sale.patient.firstName} ${sale.patient.lastName || ''}`.trim() : null) ||
+                    (sale.Patient?.name) ||
+                    (sale.Patient?.firstName ? `${sale.Patient.firstName} ${sale.Patient.lastName || ''}`.trim() : null) ||
+                    sale.customerName;
+
+                  return (
+                    <div key={sale.id} className="grid grid-cols-5 items-center p-4">
+                      <div className="font-medium">{sale.saleNo}</div>
+                      <div>
+                        {patientName ? (
+                          <span>{patientName}</span>
+                        ) : (
+                          <span className="text-muted-foreground italic">Walk-in</span>
+                        )}
+                      </div>
+                      <div>{new Date(sale.createdAt || new Date()).toLocaleDateString()}</div>
+                      <div>Rs {Number(sale.totalAmount || 0).toFixed(2)}</div>
+                      <div>
+                        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                          sale.status === 'completed' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100' : 'bg-gray-100 text-gray-800'
+                        }`}>
+                          {sale.status}
                         </span>
-                      ) : (
-                        <span className="text-muted-foreground italic">Walk-in</span>
-                      )}
+                      </div>
                     </div>
-                    <div>{new Date(sale.createdAt || new Date()).toLocaleDateString()}</div>
-                    <div>Rs {sale.totalAmount?.toFixed(2)}</div>
-                    <div>
-                      <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                        sale.status === 'completed' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100' : 'bg-gray-100 text-gray-800'
-                      }`}>
-                        {sale.status}
-                      </span>
-                    </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
           </div>
