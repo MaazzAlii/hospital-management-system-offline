@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Plus, Search, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { createClient } from "@/lib/supabase/server";
+import { prisma } from "@/lib/prisma";
 import { getCurrentUserRole, getCurrentDoctorId } from "@/lib/auth-utils";
 
 export const dynamic = "force-dynamic";
@@ -13,59 +13,50 @@ export default async function OpdVisitsPage({
 }) {
   const { q } = await searchParams;
   const { role } = await getCurrentUserRole();
-  const supabase = await createClient();
 
-  let query = supabase
-    .from("OpdVisit")
-    .select(`
-      id,
-      visitDate,
-      diagnosis,
-      status,
-      patient:Patient(name, mrn),
-      doctorId
-    `)
-    .order("visitDate", { ascending: false });
+  let whereClause: any = {};
 
   if (role?.toLowerCase() === 'doctor') {
     const currentDoctorId = await getCurrentDoctorId();
     if (currentDoctorId) {
-      query = query.eq("doctorId", currentDoctorId);
+      whereClause.doctorId = currentDoctorId;
     } else {
-      query = query.eq("id", "00000000-0000-0000-0000-000000000000");
+      whereClause.id = "non-existent";
     }
   }
 
   if (q) {
-    // Basic search filtering (PostgREST does not easily search joined tables without view or rpc, so just filtering by status for now, or you can implement a custom RPC)
-    query = query.or(`status.ilike.%${q}%,diagnosis.ilike.%${q}%`);
+    whereClause.OR = [
+      { diagnosis: { contains: q } },
+      { status: { contains: q } },
+      { patient: { name: { contains: q } } },
+      { patient: { mrn: { contains: q } } },
+      { doctor: { user: { name: { contains: q } } } },
+    ];
   }
 
-  const { data: visits } = await query;
-  
-  // Fetch doctors separately to avoid join issues
-  let doctorUsers: Record<string, string> = {};
-  if (visits && visits.length > 0) {
-    const doctorIds = [...new Set(visits.map((v) => v.doctorId))];
-    const { data: doctorsData } = await supabase.from("Doctor").select("id, userId").in("id", doctorIds);
-    if (doctorsData) {
-      const userIds = doctorsData.map(d => d.userId).filter(Boolean);
-      if (userIds.length > 0) {
-        const { data: usersData } = await supabase.from("User").select("id, name").in("id", userIds);
-        if (usersData) {
-          const userMap = usersData.reduce((acc, u) => {
-            acc[u.id] = u.name;
-            return acc;
-          }, {} as Record<string, string>);
-          
-          doctorUsers = doctorsData.reduce((acc, d) => {
-            acc[d.id] = userMap[d.userId] || "Unknown";
-            return acc;
-          }, {} as Record<string, string>);
-        }
-      }
-    }
-  }
+  const visits = await prisma.opdVisit.findMany({
+    where: whereClause,
+    include: {
+      patient: {
+        select: {
+          id: true,
+          name: true,
+          mrn: true,
+        },
+      },
+      doctor: {
+        include: {
+          user: {
+            select: {
+              name: true,
+            },
+          },
+        },
+      },
+    },
+    orderBy: { visitDate: "desc" },
+  });
 
   return (
     <div className="flex flex-col gap-6">
@@ -93,7 +84,7 @@ export default async function OpdVisitsPage({
                 type="text"
                 name="q"
                 defaultValue={q}
-                placeholder="Search diagnosis or status..."
+                placeholder="Search patient, doctor, diagnosis, status..."
                 className="w-full rounded-md border border-input bg-background pl-9 pr-4 py-2 text-sm shadow-sm outline-none focus:ring-2 focus:ring-primary/20 transition-all"
               />
             </form>
@@ -122,7 +113,8 @@ export default async function OpdVisitsPage({
                   </tr>
                 ) : (
                   visits.map((visit) => {
-                    const patient = visit.patient as any;
+                    const patient = visit.patient;
+                    const doctorName = visit.doctor?.user?.name || "Unknown";
                     return (
                       <tr key={visit.id} className="border-b last:border-0 hover:bg-muted/30 transition-colors">
                         <td className="px-4 py-3 whitespace-nowrap">
@@ -130,10 +122,10 @@ export default async function OpdVisitsPage({
                         </td>
                         <td className="px-4 py-3">
                           <div className="font-medium text-foreground">{patient?.name || "Unknown"}</div>
-                          <div className="text-xs text-muted-foreground">{patient?.mrn}</div>
+                          <div className="text-xs text-muted-foreground font-mono">{patient?.mrn}</div>
                         </td>
                         <td className="px-4 py-3 text-muted-foreground">
-                          {doctorUsers[visit.doctorId] || "Unknown"}
+                          {doctorName}
                         </td>
                         <td className="px-4 py-3 text-muted-foreground max-w-[200px] truncate">
                           {visit.diagnosis || "-"}
