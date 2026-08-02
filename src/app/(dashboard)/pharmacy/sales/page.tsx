@@ -1,5 +1,5 @@
 import { getSales } from '@/app/actions/sale'
-import { Plus } from 'lucide-react'
+import { Plus, Eye, Edit } from 'lucide-react'
 import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -27,12 +27,13 @@ export default async function SalesPage() {
         </CardHeader>
         <CardContent>
           <div className="rounded-md border">
-            <div className="grid grid-cols-5 border-b p-4 font-medium bg-muted/50">
+            <div className="grid grid-cols-6 border-b p-4 font-medium bg-muted/50">
               <div>Sale No</div>
               <div>Patient</div>
               <div>Date</div>
               <div>Total Amount</div>
               <div>Status</div>
+              <div className="text-right">Actions</div>
             </div>
             <div className="divide-y">
               {sales?.length === 0 ? (
@@ -49,7 +50,7 @@ export default async function SalesPage() {
                     sale.customerName;
 
                   return (
-                    <div key={sale.id} className="grid grid-cols-5 items-center p-4">
+                    <div key={sale.id} className="grid grid-cols-6 items-center p-4">
                       <div className="font-medium">{sale.saleNo}</div>
                       <div>
                         {patientName ? (
@@ -66,6 +67,20 @@ export default async function SalesPage() {
                         }`}>
                           {sale.status}
                         </span>
+                      </div>
+                      <div className="flex items-center justify-end gap-2">
+                        <Link href={`/pharmacy/sales/${sale.id}`}>
+                          <Button variant="outline" size="sm">
+                            <Eye className="mr-1 h-3.5 w-3.5" />
+                            View
+                          </Button>
+                        </Link>
+                        <Link href={`/pharmacy/sales/${sale.id}/edit`}>
+                          <Button variant="outline" size="sm">
+                            <Edit className="mr-1 h-3.5 w-3.5" />
+                            Edit
+                          </Button>
+                        </Link>
                       </div>
                     </div>
                   );
