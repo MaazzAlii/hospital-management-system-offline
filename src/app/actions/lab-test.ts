@@ -68,6 +68,8 @@ export async function createLabTest(data: {
   price: number;
   sampleType?: string;
   description?: string;
+  turnaroundHours?: number;
+  isActive?: boolean;
 }) {
   const { role } = await getCurrentUserRole();
   if (!hasAccess(role, 'lab', 'write')) {
