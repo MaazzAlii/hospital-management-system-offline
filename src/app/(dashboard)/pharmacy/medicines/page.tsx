@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Plus, Pill, AlertTriangle } from "lucide-react";
+import { Plus, Pill, AlertTriangle, Pencil } from "lucide-react";
 import { getMedicines } from "@/app/actions/medicine";
 import { Button } from "@/components/ui/button";
 
@@ -56,6 +56,14 @@ function MedicineTableRow({ med }: { med: MedicineRow }) {
         >
           {med.isActive ? "Active" : "Inactive"}
         </span>
+      </td>
+      <td className="px-4 py-3 text-sm text-right">
+        <Link href={`/pharmacy/medicines/${med.id}/edit`}>
+          <Button variant="ghost" size="sm" className="gap-1.5 text-primary hover:text-primary hover:bg-primary/10">
+            <Pencil className="h-3.5 w-3.5" />
+            Edit
+          </Button>
+        </Link>
       </td>
     </tr>
   );
@@ -152,6 +160,9 @@ export default async function MedicinesPage({
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                   Status
                 </th>
+                <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Actions
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -162,7 +173,7 @@ export default async function MedicinesPage({
               ) : (
                 <tr>
                   <td
-                    colSpan={7}
+                    colSpan={8}
                     className="px-4 py-12 text-center text-sm text-muted-foreground"
                   >
                     {query
