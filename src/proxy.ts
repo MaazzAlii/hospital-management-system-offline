@@ -17,7 +17,7 @@ export async function proxy(request: NextRequest) {
   }
 
   const response = NextResponse.next();
-  const session = await getIronSession<SessionData>(request.cookies, response.cookies, sessionOptions);
+  const session = await getIronSession<SessionData>(request, response, sessionOptions);
 
   const isAuthPage = pathname.startsWith("/login");
 
