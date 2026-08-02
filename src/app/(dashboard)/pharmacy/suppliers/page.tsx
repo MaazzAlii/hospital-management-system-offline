@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Plus, Users } from "lucide-react";
+import { Plus, Eye, Pencil } from "lucide-react";
 import { getSuppliers } from "@/app/actions/supplier";
 import { Button } from "@/components/ui/button";
 
@@ -38,6 +38,22 @@ function SupplierTableRow({ supplier }: { supplier: SupplierRow }) {
         >
           {supplier.isActive !== false ? "Active" : "Inactive"}
         </span>
+      </td>
+      <td className="px-4 py-3 text-sm text-right">
+        <div className="flex items-center justify-end gap-1">
+          <Link href={`/pharmacy/suppliers/${supplier.id}`}>
+            <Button variant="ghost" size="sm" className="gap-1 text-muted-foreground hover:text-foreground">
+              <Eye className="h-3.5 w-3.5" />
+              View
+            </Button>
+          </Link>
+          <Link href={`/pharmacy/suppliers/${supplier.id}/edit`}>
+            <Button variant="ghost" size="sm" className="gap-1 text-primary hover:text-primary hover:bg-primary/10">
+              <Pencil className="h-3.5 w-3.5" />
+              Edit
+            </Button>
+          </Link>
+        </div>
       </td>
     </tr>
   );
@@ -113,6 +129,9 @@ export default async function SuppliersPage({
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                   Status
                 </th>
+                <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Actions
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -123,7 +142,7 @@ export default async function SuppliersPage({
               ) : (
                 <tr>
                   <td
-                    colSpan={5}
+                    colSpan={6}
                     className="px-4 py-12 text-center text-sm text-muted-foreground"
                   >
                     {query
