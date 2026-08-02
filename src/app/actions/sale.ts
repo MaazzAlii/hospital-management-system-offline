@@ -73,10 +73,11 @@ export async function createSale(data: {
       throw new Error("Unauthorized");
     }
 
-    const saleNo = await generateSaleNo();
-
     const sale = await prisma.$transaction(async (tx) => {
-      // 1. Create Sale
+      // 1. Generate Sale No inside transaction
+      const saleNo = await generateSaleNo(tx);
+
+      // 2. Create Sale
       const createdSale = await tx.sale.create({
         data: {
           saleNo,
@@ -88,7 +89,7 @@ export async function createSale(data: {
         },
       });
 
-      // 2. Process Items & Stock Movements
+      // 3. Process Items & Stock Movements
       if (data.items && data.items.length > 0) {
         for (const item of data.items) {
           const price = item.outPrice ?? item.unitPrice ?? 0;
@@ -117,8 +118,8 @@ export async function createSale(data: {
           });
         }
 
-        // 3. Create Billing Invoice if linked
-        const invoiceNo = await generateInvoiceNo();
+        // 4. Create Billing Invoice if linked
+        const invoiceNo = await generateInvoiceNo(tx);
         let targetPatientId = data.patientId;
         
         if (!targetPatientId) {
@@ -188,9 +189,14 @@ export async function createSale(data: {
   }
 }
 
-export async function updateSale(id: string, data: {
-  status: string;
-}) {
+export async function updateSale(
+  id: string,
+  data: {
+    status?: string;
+    customerName?: string;
+    customerPhone?: string;
+  }
+) {
   try {
     const { role } = await getCurrentUserRole();
     if (!hasAccess(role, 'pharmacy', 'write')) {
@@ -199,10 +205,15 @@ export async function updateSale(id: string, data: {
 
     const sale = await prisma.sale.update({
       where: { id },
-      data: { status: data.status },
+      data: {
+        status: data.status || undefined,
+        customerName: data.customerName !== undefined ? data.customerName : undefined,
+        customerPhone: data.customerPhone !== undefined ? data.customerPhone : undefined,
+      },
     });
 
     revalidatePath("/pharmacy/sales");
+    revalidatePath(`/pharmacy/sales/${id}`);
     return { success: true, sale };
   } catch (error: unknown) {
     console.error("Error updating sale:", error);
