@@ -1,6 +1,6 @@
 {
   "name": "hms",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "main": "electron/main.js",
   "scripts": {
@@ -11,6 +11,32 @@
     "electron:dev": "electron .",
     "electron:build": "next build && electron-builder --win",
     "postinstall": "electron-rebuild"
+  },
+  "build": {
+    "appId": "com.lifecare.hms",
+    "productName": "Life Care HMS",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "electron/**/*",
+      ".next/**/*",
+      "public/**/*",
+      "node_modules/**/*",
+      "package.json",
+      "prisma/**/*",
+      "hms.db"
+    ],
+    "win": {
+      "target": "nsis"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Life Care HMS"
+    }
   },
   "prisma": {
     "seed": "npx tsx prisma/seed.ts"
@@ -43,7 +69,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@electron/rebuild": "^3.7.1",
+    "@electron/rebuild": "^4.2.0",
     "@tailwindcss/postcss": "^4",
     "@types/bcrypt": "^6.0.0",
     "@types/better-sqlite3": "^9.6.0",
@@ -51,8 +77,8 @@
     "@types/qrcode": "^1.5.6",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "electron": "^34.3.0",
-    "electron-builder": "^25.1.8",
+    "electron": "^43.2.0",
+    "electron-builder": "^26.15.3",
     "eslint": "^9",
     "eslint-config-next": "16.2.10",
     "puppeteer": "^25.3.0",
