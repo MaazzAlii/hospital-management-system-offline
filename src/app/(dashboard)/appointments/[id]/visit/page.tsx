@@ -1,60 +1,35 @@
-import { createClient } from "@/lib/supabase/server";
-import { notFound, redirect } from "next/navigation";
-import OpdVisitForm from "./form";
+import { notFound } from "next/navigation";
+import { prisma } from "@/lib/prisma";
+import { getCurrentUserRole } from "@/lib/auth-utils";
+import StartVisitForm from "./form";
 
 export const dynamic = "force-dynamic";
 
-export default async function OpdVisitPage({ params }: { params: Promise<{ id: string }> }) {
-  const resolvedParams = await params;
-  const appointmentId = resolvedParams.id;
-  const supabase = await createClient();
+export default async function StartVisitPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  await getCurrentUserRole();
+  const { id } = await params;
 
-  const { data: rawAppointment } = await supabase
-    .from("Appointment")
-    .select(`
-      id,
-      patientId,
-      doctorId,
-      status,
-      Patient ( id, name, mrn, dob, gender ),
-      Doctor ( id, userId, specialization )
-    `)
-    .eq("id", appointmentId)
-    .single();
+  const appointment = await prisma.appointment.findUnique({
+    where: { id },
+    include: {
+      patient: true,
+      doctor: {
+        include: {
+          user: {
+            select: { name: true },
+          },
+        },
+      },
+    },
+  });
 
-  if (!rawAppointment) {
-    return notFound();
+  if (!appointment) {
+    notFound();
   }
 
-  // Fetch the doctor's name from User table (due to PostgREST relationship bug)
-  let doctorName = "Unknown Doctor";
-  const doctor = Array.isArray(rawAppointment.Doctor) ? rawAppointment.Doctor[0] : rawAppointment.Doctor;
-  if (doctor?.userId) {
-    const { data: user } = await supabase
-      .from("User")
-      .select("name")
-      .eq("id", doctor.userId)
-      .single();
-    if (user?.name) {
-      doctorName = user.name;
-    }
-  }
-
-  if (rawAppointment.status === "completed") {
-    // If it's already completed, they can't start a visit again
-    redirect("/appointments");
-  }
-
-  const patient = Array.isArray(rawAppointment.Patient) ? rawAppointment.Patient[0] : rawAppointment.Patient;
-
-  const appointmentDetails = {
-    id: rawAppointment.id,
-    patientId: rawAppointment.patientId,
-    doctorId: rawAppointment.doctorId,
-    patient: patient,
-    doctorName,
-    doctorSpecialization: doctor?.specialization,
-  };
-
-  return <OpdVisitForm appointment={appointmentDetails} />;
+  return <StartVisitForm appointment={appointment} />;
 }
