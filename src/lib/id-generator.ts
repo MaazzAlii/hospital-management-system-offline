@@ -1,4 +1,5 @@
 import { prisma } from './prisma';
+import { Prisma } from '@prisma/client';
 
 // Map sequence names to their counter identifiers
 const SEQUENCES = {
@@ -12,13 +13,21 @@ const SEQUENCES = {
 
 /**
  * Get the next value from the SQLite Counter table atomically via a Prisma transaction.
- * This is safe under concurrency and prevents ID collision.
- * If the transaction fails, throws an explicit error (no silent fallback).
+ * If a transaction client 'tx' is passed, it reuses that transaction instead of starting a new nested transaction.
  */
-export async function getNextSequenceValue(name: string): Promise<number> {
+export async function getNextSequenceValue(name: string, tx?: Prisma.TransactionClient): Promise<number> {
   try {
-    const result = await prisma.$transaction(async (tx) => {
+    if (tx) {
       const counter = await tx.counter.upsert({
+        where: { name },
+        create: { name, value: 1 },
+        update: { value: { increment: 1 } },
+      });
+      return counter.value;
+    }
+
+    const result = await prisma.$transaction(async (t) => {
+      const counter = await t.counter.upsert({
         where: { name },
         create: { name, value: 1 },
         update: { value: { increment: 1 } },
@@ -36,15 +45,15 @@ export async function getNextSequenceValue(name: string): Promise<number> {
 
 /**
  * Helper function to generate formatted sequential IDs using a prefix, current year, and padded sequence.
- * e.g., generateSequentialId('mrn_seq', 'LCC', 4) => "LCC-2026-0001"
  */
 export async function generateSequentialId(
   modelName: string,
   prefix: string,
-  padding: number = 4
+  padding: number = 4,
+  tx?: Prisma.TransactionClient
 ): Promise<string> {
   const year = new Date().getFullYear();
-  const seq = await getNextSequenceValue(modelName);
+  const seq = await getNextSequenceValue(modelName, tx);
   return `${prefix}-${year}-${String(seq).padStart(padding, '0')}`;
 }
 
@@ -55,56 +64,38 @@ function formatId(prefix: string, year: number, seq: number): string {
   return `${prefix}-${year}-${String(seq).padStart(4, '0')}`;
 }
 
-/**
- * Generate formatted MRN: LCC-YYYY-XXXX (e.g., LCC-2026-0042)
- */
-export async function generateMRN(): Promise<string> {
+export async function generateMRN(tx?: Prisma.TransactionClient): Promise<string> {
   const year = new Date().getFullYear();
-  const seq = await getNextSequenceValue(SEQUENCES.mrn);
+  const seq = await getNextSequenceValue(SEQUENCES.mrn, tx);
   return formatId('LCC', year, seq);
 }
 
-/**
- * Generate formatted Invoice No: LCC-YYYY-XXXX (e.g., LCC-2026-0042)
- */
-export async function generateInvoiceNo(): Promise<string> {
+export async function generateInvoiceNo(tx?: Prisma.TransactionClient): Promise<string> {
   const year = new Date().getFullYear();
-  const seq = await getNextSequenceValue(SEQUENCES.invoice);
+  const seq = await getNextSequenceValue(SEQUENCES.invoice, tx);
   return formatId('LCC', year, seq);
 }
 
-/**
- * Generate formatted Purchase No: PUR-YYYY-XXXX (e.g., PUR-2026-0042)
- */
-export async function generatePurchaseNo(): Promise<string> {
+export async function generatePurchaseNo(tx?: Prisma.TransactionClient): Promise<string> {
   const year = new Date().getFullYear();
-  const seq = await getNextSequenceValue(SEQUENCES.purchase);
+  const seq = await getNextSequenceValue(SEQUENCES.purchase, tx);
   return formatId('PUR', year, seq);
 }
 
-/**
- * Generate formatted Sale No: SALE-YYYY-XXXX (e.g., SALE-2026-0042)
- */
-export async function generateSaleNo(): Promise<string> {
+export async function generateSaleNo(tx?: Prisma.TransactionClient): Promise<string> {
   const year = new Date().getFullYear();
-  const seq = await getNextSequenceValue(SEQUENCES.sale);
+  const seq = await getNextSequenceValue(SEQUENCES.sale, tx);
   return formatId('SALE', year, seq);
 }
 
-/**
- * Generate formatted Lab Order No: LAB-YYYY-XXXX (e.g., LAB-2026-0042)
- */
-export async function generateLabOrderNo(): Promise<string> {
+export async function generateLabOrderNo(tx?: Prisma.TransactionClient): Promise<string> {
   const year = new Date().getFullYear();
-  const seq = await getNextSequenceValue(SEQUENCES.labOrder);
+  const seq = await getNextSequenceValue(SEQUENCES.labOrder, tx);
   return formatId('LAB', year, seq);
 }
 
-/**
- * Generate formatted Sample No: SMP-YYYY-XXXX (e.g., SMP-2026-0042)
- */
-export async function generateSampleNo(): Promise<string> {
+export async function generateSampleNo(tx?: Prisma.TransactionClient): Promise<string> {
   const year = new Date().getFullYear();
-  const seq = await getNextSequenceValue(SEQUENCES.sample);
+  const seq = await getNextSequenceValue(SEQUENCES.sample, tx);
   return formatId('SMP', year, seq);
 }
