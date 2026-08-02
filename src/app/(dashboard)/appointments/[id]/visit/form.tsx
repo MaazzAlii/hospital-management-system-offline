@@ -1,84 +1,55 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Stethoscope } from "lucide-react";
+import Link from "next/link";
+import { ArrowLeft, Stethoscope, Activity, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { createOpdVisit } from "@/app/actions/opd";
 
-interface OpdVisitFormProps {
-  appointment: {
-    id: string;
-    patientId: string;
-    doctorId: string;
-    patient: { id: string; name: string; mrn: string; dob?: string; gender?: string };
-    doctorName: string;
-    doctorSpecialization?: string;
-  };
-}
-
-const inputClass =
-  "w-full rounded-lg border border-input bg-background px-3 py-2 text-sm shadow-sm outline-none ring-offset-background placeholder:text-muted-foreground focus:ring-2 focus:ring-ring transition-colors disabled:opacity-60";
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <label className="text-sm font-medium text-foreground">{label}</label>
-      {children}
-    </div>
-  );
-}
-
-export default function OpdVisitForm({ appointment }: OpdVisitFormProps) {
+export default function StartVisitForm({ appointment }: { appointment: any }) {
   const router = useRouter();
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const [vitals, setVitals] = useState({
-    bp: "",
-    pulse: "",
-    temp: "",
-    weight: "",
-    height: "",
-    spo2: "",
-  });
+  const [bp, setBp] = useState("");
+  const [hr, setHr] = useState("");
+  const [temp, setTemp] = useState("");
+  const [weight, setWeight] = useState("");
+  const [height, setHeight] = useState("");
+  const [symptoms, setSymptoms] = useState("");
   const [diagnosis, setDiagnosis] = useState("");
   const [notes, setNotes] = useState("");
-  const [followUpDate, setFollowUpDate] = useState("");
-
-  const updateVital = (key: keyof typeof vitals, value: string) => {
-    setVitals((prev) => ({ ...prev, [key]: value }));
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
     setErrorMsg(null);
 
-    const result = await createOpdVisit({
+    const res = await createOpdVisit({
+      appointmentId: appointment.id,
       patientId: appointment.patientId,
       doctorId: appointment.doctorId,
-      appointmentId: appointment.id,
-      visitDate: new Date().toISOString(),
-      vitals,
+      vitals: { bp, hr, temp, weight, height },
+      symptoms,
       diagnosis,
       notes,
-      followUpDate,
+      status: "closed",
     });
 
-    setIsSubmitting(false);
-
-    if (result.success) {
-      router.push(`/patients/${appointment.patientId}`);
+    if (res.success) {
+      router.push(`/opd/${res.visit?.id}`);
     } else {
-      setErrorMsg(result.error || "Failed to save OPD visit");
+      setErrorMsg(res.error || "Failed to save visit record");
+      setIsSubmitting(false);
     }
   };
 
+  const inputClass =
+    "w-full rounded-lg border border-input bg-background px-3 py-2 text-sm shadow-sm outline-none focus:ring-2 focus:ring-ring transition-colors";
+
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      {/* Header */}
       <div>
         <Link
           href="/appointments"
@@ -92,11 +63,25 @@ export default function OpdVisitForm({ appointment }: OpdVisitFormProps) {
             <Stethoscope className="h-5 w-5 text-primary" />
           </div>
           <div>
-            <h1 className="text-xl font-semibold tracking-tight">OPD Visit</h1>
+            <h1 className="text-xl font-semibold tracking-tight">OPD Consultation / Start Visit</h1>
             <p className="text-sm text-muted-foreground">
-              Record visit details for {appointment.patient.name}.
+              Record vitals, symptoms, diagnosis, and prescription for patient consultation.
             </p>
           </div>
+        </div>
+      </div>
+
+      {/* Patient & Doctor Banner */}
+      <div className="rounded-xl border bg-card p-5 shadow-sm grid gap-4 sm:grid-cols-2">
+        <div>
+          <p className="text-xs text-muted-foreground uppercase font-semibold tracking-wider">Patient</p>
+          <p className="text-base font-semibold text-foreground mt-0.5">{appointment.patient?.name}</p>
+          <p className="text-xs text-primary font-mono font-medium">{appointment.patient?.mrn}</p>
+        </div>
+        <div>
+          <p className="text-xs text-muted-foreground uppercase font-semibold tracking-wider">Consulting Doctor</p>
+          <p className="text-base font-semibold text-foreground mt-0.5">Dr. {appointment.doctor?.user?.name}</p>
+          <p className="text-xs text-muted-foreground">{appointment.doctor?.specialization || "General"}</p>
         </div>
       </div>
 
@@ -106,123 +91,117 @@ export default function OpdVisitForm({ appointment }: OpdVisitFormProps) {
         </div>
       )}
 
-      {/* Details Card */}
-      <div className="rounded-xl border bg-card p-6 shadow-sm space-y-2">
-        <div className="grid sm:grid-cols-2 gap-4 text-sm">
-          <div>
-            <span className="text-muted-foreground block text-xs uppercase tracking-wider mb-1">Patient</span>
-            <div className="font-medium text-base">{appointment.patient.name}</div>
-            <div className="text-muted-foreground">{appointment.patient.mrn}</div>
-          </div>
-          <div>
-            <span className="text-muted-foreground block text-xs uppercase tracking-wider mb-1">Doctor</span>
-            <div className="font-medium text-base">Dr. {appointment.doctorName}</div>
-            {appointment.doctorSpecialization && (
-              <div className="text-muted-foreground">{appointment.doctorSpecialization}</div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      <form onSubmit={handleSubmit} className="space-y-5">
-        {/* Vitals */}
+      <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Vitals Section */}
         <div className="rounded-xl border bg-card p-6 shadow-sm space-y-4">
-          <h2 className="text-sm font-semibold text-foreground">Vitals</h2>
+          <div className="flex items-center gap-2 border-b pb-3">
+            <Activity className="h-4 w-4 text-primary" />
+            <h2 className="text-base font-semibold">Patient Vitals</h2>
+          </div>
+
           <div className="grid gap-4 sm:grid-cols-3">
-            <Field label="Blood Pressure">
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">Blood Pressure (BP)</label>
               <input
                 type="text"
-                placeholder="e.g. 120/80"
-                value={vitals.bp}
-                onChange={(e) => updateVital("bp", e.target.value)}
-                className={inputClass}
+                value={bp}
+                onChange={(e) => setBp(e.target.value)}
+                placeholder="120/80 mmHg"
+                className={inputClass + " mt-1"}
               />
-            </Field>
-            <Field label="Pulse (bpm)">
-              <input
-                type="text"
-                placeholder="e.g. 72"
-                value={vitals.pulse}
-                onChange={(e) => updateVital("pulse", e.target.value)}
-                className={inputClass}
-              />
-            </Field>
-            <Field label="Temperature (°F)">
-              <input
-                type="text"
-                placeholder="e.g. 98.6"
-                value={vitals.temp}
-                onChange={(e) => updateVital("temp", e.target.value)}
-                className={inputClass}
-              />
-            </Field>
-            <Field label="Weight (kg)">
-              <input
-                type="text"
-                placeholder="e.g. 70"
-                value={vitals.weight}
-                onChange={(e) => updateVital("weight", e.target.value)}
-                className={inputClass}
-              />
-            </Field>
-            <Field label="Height (cm)">
-              <input
-                type="text"
-                placeholder="e.g. 175"
-                value={vitals.height}
-                onChange={(e) => updateVital("height", e.target.value)}
-                className={inputClass}
-              />
-            </Field>
-            <Field label="SpO2 (%)">
-              <input
-                type="text"
-                placeholder="e.g. 98"
-                value={vitals.spo2}
-                onChange={(e) => updateVital("spo2", e.target.value)}
-                className={inputClass}
-              />
-            </Field>
-          </div>
-        </div>
+            </div>
 
-        {/* Clinical Notes */}
-        <div className="rounded-xl border bg-card p-6 shadow-sm space-y-4">
-          <h2 className="text-sm font-semibold text-foreground">Clinical Details</h2>
-          <div className="space-y-4">
-            <Field label="Primary Diagnosis">
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">Heart Rate (HR)</label>
               <input
                 type="text"
-                placeholder="e.g. Viral Fever, Hypertension..."
-                value={diagnosis}
-                onChange={(e) => setDiagnosis(e.target.value)}
-                className={inputClass}
+                value={hr}
+                onChange={(e) => setHr(e.target.value)}
+                placeholder="72 bpm"
+                className={inputClass + " mt-1"}
               />
-            </Field>
-            <Field label="Notes / Prescription">
-              <textarea
-                placeholder="Enter detailed clinical notes, complaints, and prescribed medications..."
-                rows={5}
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                className={inputClass + " resize-y"}
+            </div>
+
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">Temperature (°F)</label>
+              <input
+                type="text"
+                value={temp}
+                onChange={(e) => setTemp(e.target.value)}
+                placeholder="98.6 °F"
+                className={inputClass + " mt-1"}
               />
-            </Field>
-            <div className="sm:w-1/2">
-              <Field label="Follow-up Date">
-                <input
-                  type="date"
-                  value={followUpDate}
-                  onChange={(e) => setFollowUpDate(e.target.value)}
-                  className={inputClass}
-                />
-              </Field>
+            </div>
+
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">Weight (kg)</label>
+              <input
+                type="text"
+                value={weight}
+                onChange={(e) => setWeight(e.target.value)}
+                placeholder="70 kg"
+                className={inputClass + " mt-1"}
+              />
+            </div>
+
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">Height (cm)</label>
+              <input
+                type="text"
+                value={height}
+                onChange={(e) => setHeight(e.target.value)}
+                placeholder="175 cm"
+                className={inputClass + " mt-1"}
+              />
             </div>
           </div>
         </div>
 
-        {/* Actions */}
-        <div className="flex items-center justify-end gap-3">
+        {/* Clinical Details Section */}
+        <div className="rounded-xl border bg-card p-6 shadow-sm space-y-4">
+          <div className="flex items-center gap-2 border-b pb-3">
+            <FileText className="h-4 w-4 text-primary" />
+            <h2 className="text-base font-semibold">Clinical Findings &amp; Diagnosis</h2>
+          </div>
+
+          <div className="space-y-4">
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">Symptoms / Chief Complaints</label>
+              <textarea
+                value={symptoms}
+                onChange={(e) => setSymptoms(e.target.value)}
+                placeholder="Fever, cough, headache for 3 days..."
+                rows={2}
+                className={inputClass + " mt-1 resize-none"}
+              />
+            </div>
+
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">Diagnosis</label>
+              <input
+                type="text"
+                value={diagnosis}
+                onChange={(e) => setDiagnosis(e.target.value)}
+                placeholder="Upper Respiratory Tract Infection (URTI)"
+                className={inputClass + " mt-1"}
+                required
+              />
+            </div>
+
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">Prescription &amp; Notes</label>
+              <textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Tab Paracetamol 500mg 1-1-1 for 5 days. Rest and hydration recommended."
+                rows={4}
+                className={inputClass + " mt-1 resize-none"}
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-end gap-3 pt-2">
           <Link href="/appointments">
             <Button type="button" variant="outline">
               Cancel
