@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
-import { ArrowLeft, Printer } from "lucide-react";
+import { prisma } from "@/lib/prisma";
+import { ArrowLeft } from "lucide-react";
 import PrintButton from "./print-button";
 export const dynamic = "force-dynamic";
 
@@ -11,27 +11,19 @@ export default async function InvoiceDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const supabase = await createClient();
 
-  const { data: invoiceRaw } = await supabase
-    .from("Invoice")
-    .select(`
-      *,
-      Patient (*),
-      items:InvoiceItem (*),
-      payments:Payment (*)
-    `)
-    .eq("id", id)
-    .single();
+  const invoice = await prisma.invoice.findUnique({
+    where: { id },
+    include: {
+      patient: true,
+      items: true,
+      payments: true,
+    },
+  });
 
-  if (!invoiceRaw) notFound();
+  if (!invoice) notFound();
 
-  const invoice = {
-    ...invoiceRaw,
-    patient: Array.isArray(invoiceRaw.Patient) ? invoiceRaw.Patient[0] : invoiceRaw.Patient,
-  };
-
-  const { data: settings } = await supabase.from("Settings").select("*").limit(1).maybeSingle();
+  const settings = await prisma.settings.findFirst();
 
   const clinicName = settings?.clinicName ?? "Life Care Clinic Nawagai, Buner";
   const clinicPhone = settings?.phone ?? "0343-9626941";
