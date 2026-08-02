@@ -46,10 +46,13 @@ function PatientRow({ patient }: { patient: any }) {
             <Eye className="h-3.5 w-3.5" />
             View
           </Link>
-          <button className="inline-flex items-center gap-1 rounded-md px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:bg-accent transition-colors">
+          <Link
+            href={`/patients/${patient.id}/edit`}
+            className="inline-flex items-center gap-1 rounded-md px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:bg-accent transition-colors"
+          >
             <Pencil className="h-3.5 w-3.5" />
             Edit
-          </button>
+          </Link>
         </div>
       </td>
     </tr>
