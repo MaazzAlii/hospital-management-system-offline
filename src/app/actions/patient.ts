@@ -1,6 +1,6 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
+import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { getCurrentUserRole, hasAccess } from "@/lib/auth-utils";
 import { generateMRN } from "@/lib/id-generator";
@@ -12,13 +12,10 @@ export async function getPatients() {
       return [];
     }
 
-    const supabase = await createClient();
-    const { data, error } = await supabase
-      .from('Patient')
-      .select('*')
-      .order('createdAt', { ascending: false });
-    if (error) throw error;
-    return data || [];
+    const patients = await prisma.patient.findMany({
+      orderBy: { createdAt: 'desc' },
+    });
+    return patients || [];
   } catch (error: unknown) {
     console.error("Failed to fetch patients:", error);
     return [];
@@ -39,29 +36,21 @@ export async function createPatient(data: {
       throw new Error("Unauthorized to create patients");
     }
 
-    const supabase = await createClient();
-
-    // 1. Generate MRN atomically via PostgreSQL sequence
+    // 1. Generate MRN atomically via SQLite counter transaction
     const mrn = await generateMRN();
 
-    // 2. Insert the new patient
-    const { data: newPatient, error: insertError } = await supabase
-      .from('Patient')
-      .insert({
+    // 2. Insert the new patient via Prisma
+    const newPatient = await prisma.patient.create({
+      data: {
         mrn,
         name: data.name,
-        dob: new Date(data.dob).toISOString(),
+        dob: data.dob,
         gender: data.gender,
         phone: data.phone,
         address: data.address,
         bloodGroup: data.bloodGroup || null,
-      })
-      .select()
-      .single();
-
-    if (insertError) {
-      throw new Error(`Failed to insert patient: ${insertError.message}`);
-    }
+      },
+    });
 
     revalidatePath("/patients");
     return { success: true, patient: newPatient };
