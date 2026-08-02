@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Plus, Eye, Pencil } from "lucide-react";
-import { createClient } from "@/lib/supabase/server";
+import { prisma } from "@/lib/prisma";
+import { getCurrentUserRole } from "@/lib/auth-utils";
 import { Button } from "@/components/ui/button";
 
 export const dynamic = "force-dynamic";
@@ -75,46 +76,43 @@ export default async function DoctorsPage({
 }: {
   searchParams: Promise<{ q?: string }>;
 }) {
+  await getCurrentUserRole();
+
   const resolvedSearchParams = await searchParams;
   const query = resolvedSearchParams?.q || "";
-  const supabase = await createClient();
 
-  const { data: rawDoctors } = await supabase
-    .from("Doctor")
-    .select(`id, specialization, fee, isActive, qualifications, userId`)
-    .order("createdAt", { ascending: false });
+  const whereClause = query
+    ? {
+        OR: [
+          { specialization: { contains: query } },
+          { user: { name: { contains: query } } },
+          { user: { email: { contains: query } } },
+        ],
+      }
+    : {};
 
-  // Fetch users separately to avoid RLS join issues
-  const userIds = (rawDoctors || []).map((d: any) => d.userId).filter(Boolean);
-  let usersMap: Record<string, { name: string; email: string; isActive: boolean }> = {};
-  if (userIds.length > 0) {
-    const { data: users } = await supabase
-      .from("User")
-      .select("id, name, email, isActive")
-      .in("id", userIds);
-    if (users) {
-      usersMap = Object.fromEntries(users.map((u: any) => [u.id, u]));
-    }
-  }
+  const rawDoctors = await prisma.doctor.findMany({
+    where: whereClause,
+    include: {
+      user: true,
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+  });
 
-  let doctors: DoctorWithUser[] = (rawDoctors || []).map((d: any) => ({
-    ...d,
-    user: usersMap[d.userId] || { name: "Unknown", email: "", isActive: false },
+  const totalCount = await prisma.doctor.count();
+
+  const doctors: DoctorWithUser[] = rawDoctors.map((d) => ({
+    id: d.id,
+    specialization: d.specialization,
+    fee: d.fee,
+    isActive: d.status === "active",
+    qualifications: d.qualification,
+    user: d.user
+      ? { name: d.user.name, email: d.user.email, isActive: true }
+      : { name: "Unknown", email: "", isActive: false },
   }));
-
-  if (query) {
-    const q = query.toLowerCase();
-    doctors = doctors.filter(
-      (d) =>
-        (d.user?.name || "").toLowerCase().includes(q) ||
-        (d.specialization || "").toLowerCase().includes(q) ||
-        (d.user?.email || "").toLowerCase().includes(q)
-    );
-  }
-
-  const { count: totalCount } = await supabase
-    .from("Doctor")
-    .select("*", { count: "exact", head: true });
 
   return (
     <div className="space-y-5">
