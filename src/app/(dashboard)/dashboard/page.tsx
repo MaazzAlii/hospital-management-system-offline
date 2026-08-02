@@ -1,49 +1,57 @@
 import { Users, Calendar, Stethoscope, CreditCard, Clock } from "lucide-react";
-import { createClient } from "@/lib/supabase/server";
+import { prisma } from "@/lib/prisma";
+import { getCurrentUserRole } from "@/lib/auth-utils";
 
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
-  const supabase = await createClient();
+  await getCurrentUserRole();
 
   // ── Stats ──────────────────────────────────────────────────────────
 
-  const { count: totalPatients } = await supabase
-    .from("Patient")
-    .select("*", { count: "exact", head: true });
+  const totalPatients = await prisma.patient.count();
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const tomorrow = new Date(today);
   tomorrow.setDate(tomorrow.getDate() + 1);
 
-  const { count: todaysAppointments } = await supabase
-    .from("Appointment")
-    .select("*", { count: "exact", head: true })
-    .gte("scheduledAt", today.toISOString())
-    .lt("scheduledAt", tomorrow.toISOString());
+  const todaysAppointments = await prisma.appointment.count({
+    where: {
+      scheduledAt: {
+        gte: today,
+        lt: tomorrow,
+      },
+    },
+  });
 
-  const { count: activeDoctors } = await supabase
-    .from("Doctor")
-    .select("*", { count: "exact", head: true })
-    .eq("isActive", true);
+  const activeDoctors = await prisma.doctor.count({
+    where: {
+      status: "active",
+    },
+  });
 
   // Revenue for current month (paid + partial invoices)
   const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
   const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
   endOfMonth.setHours(23, 59, 59, 999);
 
-  const { data: invoiceRevenue } = await supabase
-    .from("Invoice")
-    .select("total")
-    .in("status", ["paid", "partial"])
-    .gte("createdAt", startOfMonth.toISOString())
-    .lte("createdAt", endOfMonth.toISOString());
+  const invoiceRevenue = await prisma.invoice.aggregate({
+    _sum: {
+      total: true,
+    },
+    where: {
+      status: {
+        in: ["paid", "partial"],
+      },
+      createdAt: {
+        gte: startOfMonth,
+        lte: endOfMonth,
+      },
+    },
+  });
 
-  const currentMonthRevenue = (invoiceRevenue ?? []).reduce(
-    (sum, inv) => sum + Number(inv.total ?? 0),
-    0
-  );
+  const currentMonthRevenue = invoiceRevenue._sum.total ?? 0;
 
   const stats = [
     {
@@ -78,44 +86,53 @@ export default async function DashboardPage() {
 
   // ── Recent Activity ────────────────────────────────────────────────
 
-  const { data: recentPatients } = await supabase
-    .from("Patient")
-    .select("name, createdAt, mrn")
-    .order("createdAt", { ascending: false })
-    .limit(5);
+  const recentPatients = await prisma.patient.findMany({
+    select: {
+      name: true,
+      mrn: true,
+      createdAt: true,
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+    take: 5,
+  });
 
-  const { data: recentAppointmentsRaw } = await supabase
-    .from("Appointment")
-    .select("createdAt, patientId, doctorId, Patient(name), Doctor(userId, specialization)")
-    .order("createdAt", { ascending: false })
-    .limit(5);
+  const recentAppointmentsRaw = await prisma.appointment.findMany({
+    select: {
+      createdAt: true,
+      patient: {
+        select: {
+          name: true,
+        },
+      },
+      doctor: {
+        select: {
+          user: {
+            select: {
+              name: true,
+            },
+          },
+        },
+      },
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+    take: 5,
+  });
 
-  // Fetch doctor user names separately to avoid nested join RLS issues
-  const doctorUserIds = (recentAppointmentsRaw || [])
-    .map((a: any) => {
-      const d = Array.isArray(a.Doctor) ? a.Doctor[0] : a.Doctor;
-      return d?.userId;
-    })
-    .filter(Boolean);
-
-  let doctorUserMap: Record<string, string> = {};
-  if (doctorUserIds.length > 0) {
-    const { data: doctorUsers } = await supabase
-      .from("User")
-      .select("id, name")
-      .in("id", doctorUserIds);
-    if (doctorUsers) {
-      doctorUserMap = Object.fromEntries(doctorUsers.map((u: any) => [u.id, u.name]));
-    }
-  }
-
-  const recentAppointments = recentAppointmentsRaw;
-
-  const { data: recentInvoices } = await supabase
-    .from("Invoice")
-    .select("invoiceNo, total, createdAt")
-    .order("createdAt", { ascending: false })
-    .limit(5);
+  const recentInvoices = await prisma.invoice.findMany({
+    select: {
+      invoiceNo: true,
+      total: true,
+      createdAt: true,
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+    take: 5,
+  });
 
   type ActivityItem = { time: Date; action: string; name: string };
 
@@ -125,16 +142,13 @@ export default async function DashboardPage() {
       action: "New patient registered",
       name: `${p.name} (${p.mrn})`,
     })),
-    ...(recentAppointments ?? []).map((a: any) => {
-      const patientName =
-        Array.isArray(a.Patient) ? a.Patient[0]?.name : (a.Patient as { name: string } | null)?.name ?? "—";
-      const doctor = Array.isArray(a.Doctor) ? a.Doctor[0] : a.Doctor;
-      const doctorUserId = doctor?.userId;
-      const doctorName = doctorUserId ? (doctorUserMap[doctorUserId] ?? "—") : "—";
+    ...(recentAppointmentsRaw ?? []).map((a) => {
+      const patientName = a.patient?.name ?? "—";
+      const doctorName = a.doctor?.user?.name ?? "—";
       return {
         time: new Date(a.createdAt),
         action: "Appointment booked",
-        name: `${doctorName} – ${patientName}`,
+        name: `Dr. ${doctorName} – ${patientName}`,
       };
     }),
     ...(recentInvoices ?? []).map((i) => ({
