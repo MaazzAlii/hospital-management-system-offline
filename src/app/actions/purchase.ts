@@ -1,95 +1,131 @@
-'use server'
+"use server";
 
-import { createClient } from '@/lib/supabase/server'
-import { revalidatePath } from 'next/cache'
-import { getCurrentUserRole, hasAccess } from '@/lib/auth-utils'
-import { generatePurchaseNo } from '@/lib/id-generator'
+import { prisma } from "@/lib/prisma";
+import { revalidatePath } from "next/cache";
+import { getCurrentUserRole, hasAccess } from "@/lib/auth-utils";
+import { generatePurchaseNo } from "@/lib/id-generator";
 
 export async function getPurchases() {
-  const supabase = await createClient()
-  const { data, error } = await supabase
-    .from('Purchase')
-    .select(`
-      *,
-      Supplier (*)
-    `)
-    .order('createdAt', { ascending: false })
+  try {
+    const { role } = await getCurrentUserRole();
+    if (!hasAccess(role, 'pharmacy', 'read')) {
+      throw new Error('Unauthorized');
+    }
 
-  if (error) {
-    console.error('Error fetching purchases:', error)
-    throw new Error('Failed to fetch purchases')
+    return await prisma.purchase.findMany({
+      include: {
+        supplier: true,
+        items: {
+          include: {
+            medicine: true,
+          },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+  } catch (error) {
+    console.error("Error fetching purchases:", error);
+    return [];
   }
-
-  return data
 }
 
-export async function createPurchase(data: any) {
-  const { role } = await getCurrentUserRole();
-  if (!hasAccess(role, 'pharmacy', 'write')) {
-    throw new Error('Unauthorized');
-  }
-
-  const supabase = await createClient()
-  const purchaseNo = data.purchaseNo || (await generatePurchaseNo());
-
-  // Create Purchase
-  const { data: purchase, error: purchaseError } = await supabase
-    .from('Purchase')
-    .insert({
-      purchaseNo,
-      supplierId: data.supplierId,
-      totalAmount: data.totalAmount,
-      status: data.status || 'completed',
-      notes: data.notes
-    })
-    .select()
-    .single()
-
-  if (purchaseError) {
-    console.error('Error creating purchase:', purchaseError)
-    throw new Error('Failed to create purchase')
-  }
-
-  if (data.items && data.items.length > 0) {
-    // Create PurchaseItems
-    const itemsToInsert = data.items.map((item: any) => ({
-      purchaseId: purchase.id,
-      medicineId: item.medicineId,
-      quantity: item.quantity,
-      inPrice: item.inPrice,
-      batchNo: item.batchNo || null,
-      expiryDate: item.expiryDate ? new Date(item.expiryDate).toISOString() : null
-    }))
-
-    const { error: itemsError } = await supabase
-      .from('PurchaseItem')
-      .insert(itemsToInsert)
-
-    if (itemsError) {
-      console.error('Error creating purchase items:', itemsError)
-      throw new Error('Failed to create purchase items')
+export async function getPurchaseById(id: string) {
+  try {
+    const { role } = await getCurrentUserRole();
+    if (!hasAccess(role, 'pharmacy', 'read')) {
+      return null;
     }
 
-    // Create StockMovements
-    const movementsToInsert = data.items.map((item: any) => ({
-      medicineId: item.medicineId,
-      type: 'purchase',
-      quantity: item.quantity, // Positive for purchases
-      referenceId: purchase.id,
-      notes: `Purchase ${purchase.purchaseNo}`
-    }))
-
-    const { error: movementsError } = await supabase
-      .from('StockMovement')
-      .insert(movementsToInsert)
-
-    if (movementsError) {
-      console.error('Error creating stock movements:', movementsError)
-      throw new Error('Failed to create stock movements')
-    }
+    return await prisma.purchase.findUnique({
+      where: { id },
+      include: {
+        supplier: true,
+        items: {
+          include: {
+            medicine: true,
+          },
+        },
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching purchase details:", error);
+    return null;
   }
+}
 
-  revalidatePath('/pharmacy/purchases')
-  revalidatePath('/pharmacy/medicines')
-  return purchase
+export async function createPurchase(data: {
+  supplierId: string;
+  totalAmount: number;
+  status?: string;
+  notes?: string;
+  items: Array<{
+    medicineId: string;
+    quantity: number;
+    inPrice?: number;
+    unitPrice?: number;
+    batchNo?: string;
+    expiryDate?: string | Date;
+  }>;
+}) {
+  try {
+    const { role } = await getCurrentUserRole();
+    if (!hasAccess(role, 'pharmacy', 'write')) {
+      throw new Error("Unauthorized");
+    }
+
+    const purchaseNo = await generatePurchaseNo();
+
+    const purchase = await prisma.$transaction(async (tx) => {
+      const createdPurchase = await tx.purchase.create({
+        data: {
+          purchaseNo,
+          supplierId: data.supplierId || null,
+          totalAmount: data.totalAmount,
+          status: data.status || "completed",
+          notes: data.notes || null,
+        },
+      });
+
+      if (data.items && data.items.length > 0) {
+        for (const item of data.items) {
+          const price = item.unitPrice ?? item.inPrice ?? 0;
+          const createdItem = await tx.purchaseItem.create({
+            data: {
+              purchaseId: createdPurchase.id,
+              medicineId: item.medicineId,
+              quantity: item.quantity,
+              unitPrice: price,
+              totalPrice: price * item.quantity,
+              batchNo: item.batchNo || null,
+              expiryDate: item.expiryDate ? new Date(item.expiryDate) : null,
+            },
+          });
+
+          await tx.stockMovement.create({
+            data: {
+              medicineId: item.medicineId,
+              purchaseItemId: createdItem.id,
+              type: "purchase",
+              quantity: item.quantity,
+              referenceType: "Purchase",
+              referenceId: createdPurchase.id,
+              notes: `Purchase ${createdPurchase.purchaseNo}`,
+            },
+          });
+        }
+      }
+
+      return createdPurchase;
+    });
+
+    revalidatePath("/pharmacy/purchases");
+    revalidatePath("/pharmacy/medicines");
+    return { success: true, purchase };
+  } catch (error: unknown) {
+    console.error("Error creating purchase:", error);
+    return {
+      success: false,
+      error: (error instanceof Error ? error.message : String(error)) || "Failed to create purchase",
+    };
+  }
 }
