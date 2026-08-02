@@ -166,7 +166,7 @@ export async function createSale(data: {
               description: medicineMap.get(item.medicineId) || "Medicine",
               quantity: item.quantity,
               unitPrice: price,
-              total: price * item.quantity,
+              amount: price * item.quantity,
             },
           });
         }
