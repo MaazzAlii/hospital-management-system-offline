@@ -16,7 +16,10 @@
   "build": {
     "appId": "com.lifecare.hms",
     "productName": "Life Care HMS",
-    "asar": false,
+    "asar": true,
+    "asarUnpack": [
+      "**/*"
+    ],
     "npmRebuild": false,
     "buildDependenciesFromSource": false,
     "directories": {
