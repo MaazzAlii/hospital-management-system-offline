@@ -17,8 +17,9 @@
 /.next/
 /out/
 
-# production
+# production & desktop builds
 /build
+/dist
 
 # misc
 .DS_Store
@@ -58,11 +59,6 @@ AGENTS.md
 CLAUDE.md
 .ai/
 
-
-
-
-/src/generated/prisma
-
 # SQLite database files
 *.db
 *.db-journal
@@ -74,4 +70,3 @@ _agents/skills/prisma-cli/references/
 .agents/
 .claude/
 .windsurf/
-
