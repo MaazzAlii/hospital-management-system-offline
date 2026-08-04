@@ -17,9 +17,6 @@
     "appId": "com.lifecare.hms",
     "productName": "Life Care HMS",
     "asar": true,
-    "asarUnpack": [
-      ".next/standalone/**/*"
-    ],
     "npmRebuild": false,
     "buildDependenciesFromSource": false,
     "directories": {
