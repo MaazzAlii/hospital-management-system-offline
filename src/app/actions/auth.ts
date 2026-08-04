@@ -23,7 +23,7 @@ export async function login(prevState: any, formData?: FormData) {
   }
 
   if (!email || !password) {
-    return { error: "Email and password are required." };
+    return { error: "Email and password are required.", values: { email, password } };
   }
 
   try {
@@ -43,12 +43,12 @@ export async function login(prevState: any, formData?: FormData) {
     });
 
     if (!user || !user.passwordHash) {
-      return { error: "Invalid email or password." };
+      return { error: "Invalid email or password.", values: { email, password } };
     }
 
     const isPasswordValid = await compare(password, user.passwordHash);
     if (!isPasswordValid) {
-      return { error: "Invalid email or password." };
+      return { error: "Invalid email or password.", values: { email, password } };
     }
 
     const session = await getSession();
@@ -62,8 +62,16 @@ export async function login(prevState: any, formData?: FormData) {
     session.isLoggedIn = true;
     await session.save();
   } catch (error: any) {
-    console.error("Login error:", error);
-    return { error: "An unexpected error occurred during login." };
+    console.error("[LOGIN_ERROR]", error);
+    try {
+      const fs = require("fs");
+      const path = require("path");
+      const logMsg = `[LOGIN_ERROR ${new Date().toISOString()}]\n${error && error.stack ? error.stack : String(error)}\n\n`;
+      fs.appendFileSync(path.join(process.cwd(), "server-error.log"), logMsg);
+    } catch (fsErr) {
+      console.error("Failed to write to server-error.log:", fsErr);
+    }
+    return { error: "An unexpected error occurred during login.", values: { email, password } };
   }
 
   revalidatePath("/", "layout");
