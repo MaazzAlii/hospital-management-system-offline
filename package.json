@@ -16,11 +16,7 @@
   "build": {
     "appId": "com.lifecare.hms",
     "productName": "Life Care HMS",
-    "asar": true,
-    "asarUnpack": [
-      ".next/standalone/server.js",
-      ".next/standalone/prisma/**/*"
-    ],
+    "asar": false,
     "npmRebuild": false,
     "buildDependenciesFromSource": false,
     "directories": {
