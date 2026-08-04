@@ -39,10 +39,7 @@ function ensureDatabaseExists() {
 }
 
 function startNextServer(port) {
-  let appPath = app.getAppPath();
-  if (appPath.endsWith('.asar')) {
-    appPath = path.join(path.dirname(appPath), 'app.asar.unpacked');
-  }
+  const appPath = app.getAppPath();
   const serverPath = path.join(appPath, '.next', 'standalone', 'server.js');
 
   console.log(`[Electron] Starting Next.js server on port ${port}...`);
