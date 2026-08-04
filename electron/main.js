@@ -44,36 +44,60 @@ function startNextServer(port) {
 
   console.log(`[Electron] Starting Next.js server on port ${port}...`);
 
+  const dbFilePath = path.join(userDataPath, 'hms.db');
+  const dbUrl = `file:${dbFilePath.replace(/\\/g, '/')}`;
+
   process.env.NODE_ENV = 'production';
   process.env.PORT = String(port);
-  process.env.DATABASE_URL = databaseUrl;
+  process.env.DATABASE_URL = dbUrl;
+
+  console.log('[Electron] Environment injected:');
+  console.log('  NODE_ENV:', process.env.NODE_ENV);
+  console.log('  PORT:', process.env.PORT);
+  console.log('  DATABASE_URL:', process.env.DATABASE_URL);
 
   if (fs.existsSync(serverPath)) {
     try {
-      console.log(`[Electron] Requiring standalone server: ${serverPath}`);
+      console.log('[Electron] Standalone server found at:', serverPath);
+      try {
+        const resolved = require.resolve(serverPath);
+        if (require.cache[resolved]) {
+          delete require.cache[resolved];
+          console.log('[Electron] Cleared require cache for serverPath');
+        }
+      } catch (cacheErr) {}
+
+      console.log('[Electron] BEFORE require(serverPath)');
       require(serverPath);
+      console.log('[Electron] AFTER require(serverPath) - server initialized successfully');
       return;
     } catch (err) {
-      console.error('[Electron] Direct require of server.js failed:', err);
+      console.error('[Electron] Exception thrown during require(serverPath):', err);
+      const errLogPath = path.join(userDataPath, 'server-error.log');
+      fs.writeFileSync(errLogPath, String(err && err.stack ? err.stack : err));
     }
+  } else {
+    console.log('[Electron] Standalone server file not found at:', serverPath);
   }
 
   const spawnEnv = {
     ...process.env,
     NODE_ENV: 'production',
-    DATABASE_URL: databaseUrl,
+    DATABASE_URL: dbUrl,
     PORT: String(port),
     ELECTRON_RUN_AS_NODE: '1',
   };
 
   const nextBin = path.join(appPath, 'node_modules', 'next', 'dist', 'bin', 'next');
   if (fs.existsSync(nextBin)) {
+    console.log('[Electron] Falling back to next bin at:', nextBin);
     serverProcess = spawn(process.execPath, [nextBin, 'start', '-p', String(port)], {
       cwd: appPath,
       env: spawnEnv,
       stdio: 'inherit',
     });
   } else {
+    console.log('[Electron] Falling back to npx next start...');
     const isWin = process.platform === 'win32';
     const npmCmd = isWin ? 'npx.cmd' : 'npx';
     serverProcess = spawn(npmCmd, ['next', 'start', '-p', String(port)], {
@@ -141,7 +165,13 @@ function createWindow(port) {
     })
     .catch((err) => {
       console.error('[Electron] Server failed to load:', err);
-      win.loadURL(`data:text/html,<h2>Server Start Error</h2><p>${err.message}</p>`);
+      const errLogPath = path.join(userDataPath, 'server-error.log');
+      let extraErr = '';
+      if (fs.existsSync(errLogPath)) {
+        extraErr = fs.readFileSync(errLogPath, 'utf8');
+      }
+      const safeExtra = extraErr ? extraErr.replace(/</g, '&lt;').replace(/>/g, '&gt;') : 'No error log recorded.';
+      win.loadURL(`data:text/html,<h2>Server Start Error</h2><p>${err.message}</p><hr/><pre style="color:red;white-space:pre-wrap;">${safeExtra}</pre>`);
     });
 }
 
