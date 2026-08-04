@@ -67,9 +67,14 @@ function startNextServer(port) {
         }
       } catch (cacheErr) {}
 
+      const standaloneDir = path.dirname(serverPath);
+      console.log('[Electron] Setting CWD to standalone directory:', standaloneDir);
+      process.chdir(standaloneDir);
+
       console.log('[Electron] BEFORE require(serverPath)');
       require(serverPath);
       console.log('[Electron] AFTER require(serverPath) - server initialized successfully');
+      process.chdir(appPath);
       return;
     } catch (err) {
       console.error('[Electron] Exception thrown during require(serverPath):', err);
@@ -80,6 +85,7 @@ function startNextServer(port) {
     console.log('[Electron] Standalone server file not found at:', serverPath);
   }
 
+  const standaloneDir = path.dirname(serverPath);
   const spawnEnv = {
     ...process.env,
     NODE_ENV: 'production',
@@ -92,7 +98,7 @@ function startNextServer(port) {
   if (fs.existsSync(nextBin)) {
     console.log('[Electron] Falling back to next bin at:', nextBin);
     serverProcess = spawn(process.execPath, [nextBin, 'start', '-p', String(port)], {
-      cwd: appPath,
+      cwd: standaloneDir,
       env: spawnEnv,
       stdio: 'inherit',
     });
@@ -101,7 +107,7 @@ function startNextServer(port) {
     const isWin = process.platform === 'win32';
     const npmCmd = isWin ? 'npx.cmd' : 'npx';
     serverProcess = spawn(npmCmd, ['next', 'start', '-p', String(port)], {
-      cwd: appPath,
+      cwd: standaloneDir,
       env: spawnEnv,
       shell: true,
       stdio: 'inherit',
