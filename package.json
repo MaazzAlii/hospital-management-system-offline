@@ -18,7 +18,8 @@
     "productName": "Life Care HMS",
     "asar": true,
     "asarUnpack": [
-      ".next/standalone/**/*"
+      ".next/standalone/server.js",
+      ".next/standalone/prisma/**/*"
     ],
     "npmRebuild": false,
     "buildDependenciesFromSource": false,
