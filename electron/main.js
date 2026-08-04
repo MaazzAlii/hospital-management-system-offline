@@ -40,7 +40,7 @@ function ensureDatabaseExists() {
 
 function startNextServer(port) {
   const appPath = app.getAppPath();
-  const nextBin = path.join(appPath, 'node_modules', 'next', 'dist', 'bin', 'next');
+  const serverPath = path.join(appPath, '.next', 'standalone', 'server.js');
 
   console.log(`[Electron] Starting Next.js server on port ${port}...`);
 
@@ -49,24 +49,37 @@ function startNextServer(port) {
     NODE_ENV: 'production',
     DATABASE_URL: databaseUrl,
     PORT: String(port),
+    ELECTRON_RUN_AS_NODE: '1',
   };
 
-  if (fs.existsSync(nextBin)) {
-    serverProcess = spawn(process.execPath, [nextBin, 'start', '-p', String(port)], {
-      cwd: appPath,
+  if (fs.existsSync(serverPath)) {
+    const standaloneDir = path.dirname(serverPath);
+    console.log(`[Electron] Found standalone server at: ${serverPath}`);
+    console.log(`[Electron] Server working directory: ${standaloneDir}`);
+    serverProcess = spawn(process.execPath, [serverPath], {
+      cwd: standaloneDir,
       env: spawnEnv,
       stdio: 'inherit',
     });
   } else {
-    // Fallback to npx next start if bin path isn't directly resolved
-    const isWin = process.platform === 'win32';
-    const npmCmd = isWin ? 'npx.cmd' : 'npx';
-    serverProcess = spawn(npmCmd, ['next', 'start', '-p', String(port)], {
-      cwd: appPath,
-      env: spawnEnv,
-      shell: true,
-      stdio: 'inherit',
-    });
+    console.log(`[Electron] Standalone server not found at ${serverPath}, falling back to next start...`);
+    const nextBin = path.join(appPath, 'node_modules', 'next', 'dist', 'bin', 'next');
+    if (fs.existsSync(nextBin)) {
+      serverProcess = spawn(process.execPath, [nextBin, 'start', '-p', String(port)], {
+        cwd: appPath,
+        env: spawnEnv,
+        stdio: 'inherit',
+      });
+    } else {
+      const isWin = process.platform === 'win32';
+      const npmCmd = isWin ? 'npx.cmd' : 'npx';
+      serverProcess = spawn(npmCmd, ['next', 'start', '-p', String(port)], {
+        cwd: appPath,
+        env: spawnEnv,
+        shell: true,
+        stdio: 'inherit',
+      });
+    }
   }
 
   serverProcess.on('error', (err) => {
