@@ -4,6 +4,7 @@ import { sessionOptions, SessionData } from "./lib/session";
 import { hasAccess } from "./lib/permissions";
 
 export async function proxy(request: NextRequest) {
+  return NextResponse.next();
   const { pathname } = request.nextUrl;
 
   // Skip internal Next.js requests (turbopack HMR, static assets, API)
