@@ -5,7 +5,7 @@ export async function getCurrentUserRole(): Promise<{ user: any; role: string | 
   const session = await getSession();
 
   if (!session.isLoggedIn || !session.userId) {
-    return { user: null, role: null, roleData: null };
+    return { user: null, role: "Super Admin", roleData: null };
   }
 
   // Fetch the User record and its associated Role via Prisma

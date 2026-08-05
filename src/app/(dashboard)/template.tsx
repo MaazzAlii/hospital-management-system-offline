@@ -24,7 +24,7 @@ export default async function DashboardTemplate({
   else if (pathname.startsWith("/billing")) module = "billing";
   else if (pathname.startsWith("/settings")) module = "settings";
 
-  if (!hasAccess(role, module, "read")) {
+  if (pathname !== "/dashboard" && pathname !== "" && !hasAccess(role, module, "read")) {
     redirect("/dashboard");
   }
 

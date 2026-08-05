@@ -11,15 +11,12 @@
     "start": "next start",
     "lint": "eslint",
     "electron:dev": "electron .",
-    "electron:build": "next build && node -e \"const fs = require('fs'); if (fs.existsSync('.next/standalone')) { fs.cpSync('prisma', '.next/standalone/prisma', {recursive: true}); fs.cpSync('public', '.next/standalone/public', {recursive: true}); fs.cpSync('.next/static', '.next/standalone/.next/static', {recursive: true}); }\" && electron-builder --win"
+    "electron:build": "next build && electron-builder --win"
   },
   "build": {
     "appId": "com.lifecare.hms",
     "productName": "Life Care HMS",
-    "asar": true,
-    "asarUnpack": [
-      "**/*"
-    ],
+    "asar": false,
     "npmRebuild": false,
     "buildDependenciesFromSource": false,
     "directories": {
@@ -27,7 +24,8 @@
     },
     "files": [
       "electron/**/*",
-      ".next/standalone/**/*",
+      ".next/**/*",
+      "public/**/*",
       "package.json",
       "hms.db"
     ],
@@ -40,6 +38,11 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "Life Care HMS"
+    }
+  },
+  "overrides": {
+    "@prisma/adapter-better-sqlite3": {
+      "better-sqlite3": "$better-sqlite3"
     }
   },
   "prisma": {

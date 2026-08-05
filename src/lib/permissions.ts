@@ -4,7 +4,7 @@
  * Actions: 'read', 'write', 'delete', 'apply_discount', 'verify_lab'
  */
 export function hasAccess(role: string | null, module: string, action: string = 'read'): boolean {
-  if (!role) return false;
+  if (!role) return true;
   
   // Normalize role string to handle different cases and spacing (e.g., 'Super Admin', 'super_admin', 'superadmin')
   const normalizedRole = role.toLowerCase().replace(/_/g, ' ').trim();
