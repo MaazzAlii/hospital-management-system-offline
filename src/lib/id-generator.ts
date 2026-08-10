@@ -1,5 +1,5 @@
 import { prisma } from './prisma';
-import { Prisma } from '@prisma/client';
+import { Prisma } from '@/generated/prisma';
 
 // Map sequence names to their counter identifiers
 const SEQUENCES = {
