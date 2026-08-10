@@ -73,9 +73,22 @@ function startNextServer(port) {
     NODE_ENV: 'production',
     PORT: String(port),
     DATABASE_URL: dbUrl,
+    HMS_LOG_DIR: userDataPath,
     ELECTRON_RUN_AS_NODE: '1',
     ELECTRON_ENABLE_LOGGING: '1',
   };
+
+  const generatedClientDir = path.join(appPath, 'src', 'generated', 'prisma');
+  let engineFile = null;
+  try {
+    engineFile = fs.readdirSync(generatedClientDir).find(f => f.endsWith('.node'));
+  } catch (e) {}
+
+  if (engineFile) {
+    spawnEnv.PRISMA_QUERY_ENGINE_LIBRARY = path.join(generatedClientDir, engineFile);
+    console.log('[Electron] PRISMA_QUERY_ENGINE_LIBRARY set to:', spawnEnv.PRISMA_QUERY_ENGINE_LIBRARY);
+    try { fs.appendFileSync(errLogPath, `[Electron] PRISMA_QUERY_ENGINE_LIBRARY: ${spawnEnv.PRISMA_QUERY_ENGINE_LIBRARY}\n`); } catch (e) {}
+  }
 
   if (nextBinExists) {
     spawnArgs = [nextBin, 'start', '-p', String(port)];
@@ -169,7 +182,17 @@ function createWindow(port) {
     },
   });
 
+  if (process.env.HMS_DEBUG === '1') {
+    win.webContents.openDevTools({ mode: 'detach' });
+  }
+
   const url = `http://localhost:${port}`;
+
+  win.webContents.on('render-process-gone', (event, details) => {
+    const msg = `[Renderer Crash] ${JSON.stringify(details)}\n`;
+    console.error(msg);
+    try { fs.appendFileSync(path.join(userDataPath, 'server-error.log'), msg); } catch (e) {}
+  });
 
   win.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL) => {
     console.error('[Electron] Window failed to load:', errorCode, errorDescription, validatedURL);
