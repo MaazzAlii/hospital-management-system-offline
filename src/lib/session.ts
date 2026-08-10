@@ -14,7 +14,7 @@ export const sessionOptions: SessionOptions = {
   password: process.env.SESSION_SECRET || 'life_care_clinic_hms_secure_session_secret_32_chars_min',
   cookieName: 'hms_session',
   cookieOptions: {
-    secure: process.env.NODE_ENV === 'production',
+    secure: false,
     httpOnly: true,
     sameSite: 'lax',
     path: '/',

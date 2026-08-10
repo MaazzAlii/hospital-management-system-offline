@@ -66,8 +66,9 @@ export async function login(prevState: any, formData?: FormData) {
     try {
       const fs = require("fs");
       const path = require("path");
+      const logDir = process.env.HMS_LOG_DIR || process.cwd();
       const logMsg = `[LOGIN_ERROR ${new Date().toISOString()}]\n${error && error.stack ? error.stack : String(error)}\n\n`;
-      fs.appendFileSync(path.join(process.cwd(), "server-error.log"), logMsg);
+      fs.appendFileSync(path.join(logDir, "server-error.log"), logMsg);
     } catch (fsErr) {
       console.error("Failed to write to server-error.log:", fsErr);
     }
