@@ -11,7 +11,7 @@
     "start": "next start",
     "lint": "eslint",
     "electron:dev": "electron .",
-    "electron:build": "next build && node scripts/copy-prisma-engine.js && electron-builder --win",
+    "electron:build": "next build && node scripts/copy-prisma-engine.js && node scripts/download-vc-redist.js && electron-builder --win",
     "postinstall": "electron-rebuild -f -w better-sqlite3"
   },
   "build": {
@@ -45,7 +45,8 @@
       "perMachine": false,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Life Care HMS"
+      "shortcutName": "Life Care HMS",
+      "include": "build/installer.nsh"
     }
   },
   "overrides": {
