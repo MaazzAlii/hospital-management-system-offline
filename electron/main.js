@@ -6,11 +6,134 @@ const { spawn, execSync } = require('child_process');
 
 let serverProcess = null;
 let isQuitting = false;
+let mainWindow = null;
+let serverExited = false;
+let serverExitCode = null;
+let serverExitSignal = null;
+let serverStartedSuccessfully = false;
+let capturedLogs = [];
+
+function appendCapturedLog(str) {
+  if (!str) return;
+  const lines = str.split(/\r?\n/);
+  for (const line of lines) {
+    if (line.trim()) {
+      capturedLogs.push(line);
+      if (capturedLogs.length > 500) {
+        capturedLogs.shift();
+      }
+    }
+  }
+}
 
 // Determine writable user data database path
 const userDataPath = app.getPath('userData');
 const dbPath = path.join(userDataPath, 'hms.db');
 const databaseUrl = `file:${dbPath.replace(/\\/g, '/')}`;
+
+function renderCrashPage(win, code, signal, logsText, logPath) {
+  if (!win || win.isDestroyed()) return;
+
+  const safeLogs = (logsText || 'No stderr or stdout logs captured before process exited.')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+  const safeLogPath = (logPath || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+  const htmlContent = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>HMS Startup Error</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: #0f172a;
+      color: #f8fafc;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      padding: 32px;
+      line-height: 1.5;
+    }
+    .card {
+      background-color: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 24px;
+      max-width: 1000px;
+      margin: 0 auto;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+    }
+    h1 {
+      color: #f87171;
+      font-size: 22px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+    .meta-grid {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 8px 16px;
+      background: #0f172a;
+      padding: 16px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      font-size: 14px;
+      border: 1px solid #334155;
+    }
+    .meta-label { font-weight: 600; color: #94a3b8; }
+    .meta-val { color: #e2e8f0; font-family: monospace; word-break: break-all; }
+    .logs-header {
+      font-size: 14px;
+      font-weight: 600;
+      color: #cbd5e1;
+      margin-bottom: 8px;
+    }
+    pre {
+      background: #020617;
+      color: #ffb86c;
+      border: 1px solid #334155;
+      padding: 16px;
+      border-radius: 8px;
+      font-family: 'Consolas', 'Courier New', monospace;
+      font-size: 13px;
+      white-space: pre-wrap;
+      word-break: break-all;
+      max-height: 420px;
+      overflow-y: auto;
+    }
+    .footer-note {
+      margin-top: 20px;
+      font-size: 13px;
+      color: #94a3b8;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>⚠️ Next.js Server Process Crashed</h1>
+    <p style="margin-bottom: 16px; color: #cbd5e1;">The backend Next.js process exited before port 3456 became reachable.</p>
+    
+    <div class="meta-grid">
+      <div class="meta-label">Exit Code:</div>
+      <div class="meta-val">${code !== null && code !== undefined ? code : 'N/A (Process timed out or killed)'}</div>
+      <div class="meta-label">Exit Signal:</div>
+      <div class="meta-val">${signal || 'None'}</div>
+      <div class="meta-label">Log File Path:</div>
+      <div class="meta-val">${safeLogPath}</div>
+    </div>
+
+    <div class="logs-header">Captured Stderr Output (Last ~50 lines):</div>
+    <pre>${safeLogs}</pre>
+
+    <p class="footer-note">📸 <strong>Note:</strong> Please take a screenshot of this window or copy the Log File Path above to report this error.</p>
+  </div>
+</body>
+</html>`;
+
+  win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(htmlContent)}`);
+}
 
 function ensureDatabaseExists() {
   try {
@@ -35,6 +158,9 @@ function ensureDatabaseExists() {
     }
   } catch (err) {
     console.error('[Electron] Database initialization error:', err);
+    const msg = `[Database Init Error] ${err.stack || err}\n`;
+    appendCapturedLog(msg);
+    try { fs.appendFileSync(path.join(userDataPath, 'server-error.log'), msg); } catch (e) {}
   }
 }
 
@@ -116,6 +242,7 @@ function startNextServer(port) {
     serverProcess.stdout.on('data', (data) => {
       const str = data.toString();
       console.log('[Next.js]', str.trim());
+      appendCapturedLog(str);
       try { fs.appendFileSync(errLogPath, str); } catch (e) {}
     });
   }
@@ -124,6 +251,7 @@ function startNextServer(port) {
     serverProcess.stderr.on('data', (data) => {
       const str = data.toString();
       console.error('[Next.js STDERR]', str.trim());
+      appendCapturedLog(str);
       try { fs.appendFileSync(errLogPath, str); } catch (e) {}
     });
   }
@@ -131,13 +259,25 @@ function startNextServer(port) {
   serverProcess.on('error', (err) => {
     const msg = `[Spawn Error] ${err.stack || err}\n`;
     console.error(msg);
+    appendCapturedLog(msg);
     try { fs.appendFileSync(errLogPath, msg); } catch (e) {}
   });
 
   serverProcess.on('exit', (code, signal) => {
     const msg = `[Server Exit] code=${code} signal=${signal}\n`;
     console.log(msg);
+    appendCapturedLog(msg);
     try { fs.appendFileSync(errLogPath, msg); } catch (e) {}
+
+    serverExited = true;
+    serverExitCode = code;
+    serverExitSignal = signal;
+
+    if (!serverStartedSuccessfully && mainWindow && !mainWindow.isDestroyed()) {
+      const errLogPath = path.join(userDataPath, 'server-error.log');
+      const lastLogs = capturedLogs.slice(-50).join('\n');
+      renderCrashPage(mainWindow, code, signal, lastLogs, errLogPath);
+    }
   });
 }
 
@@ -146,6 +286,10 @@ function waitForServer(url, timeoutMs = 25000, intervalMs = 250) {
     const startTime = Date.now();
 
     const check = () => {
+      if (serverExited) {
+        return reject(new Error(`Server process exited with code ${serverExitCode} (signal: ${serverExitSignal}) before port became reachable.`));
+      }
+
       http
         .get(url, (res) => {
           if (res.statusCode === 200 || res.statusCode === 307 || res.statusCode === 302) {
@@ -160,6 +304,9 @@ function waitForServer(url, timeoutMs = 25000, intervalMs = 250) {
     };
 
     const retry = () => {
+      if (serverExited) {
+        return reject(new Error(`Server process exited with code ${serverExitCode} (signal: ${serverExitSignal}) before port became reachable.`));
+      }
       if (Date.now() - startTime >= timeoutMs) {
         reject(new Error(`Timed out waiting for server at ${url}`));
       } else {
@@ -172,7 +319,7 @@ function waitForServer(url, timeoutMs = 25000, intervalMs = 250) {
 }
 
 function createWindow(port) {
-  const win = new BrowserWindow({
+  mainWindow = new BrowserWindow({
     width: 1280,
     height: 800,
     title: 'Life Care Clinic HMS',
@@ -183,49 +330,44 @@ function createWindow(port) {
   });
 
   if (process.env.HMS_DEBUG === '1') {
-    win.webContents.openDevTools({ mode: 'detach' });
+    mainWindow.webContents.openDevTools({ mode: 'detach' });
   }
 
   const url = `http://localhost:${port}`;
 
-  win.webContents.on('render-process-gone', (event, details) => {
+  mainWindow.webContents.on('render-process-gone', (event, details) => {
     const msg = `[Renderer Crash] ${JSON.stringify(details)}\n`;
     console.error(msg);
     try { fs.appendFileSync(path.join(userDataPath, 'server-error.log'), msg); } catch (e) {}
   });
 
-  win.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL) => {
+  mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL) => {
     console.error('[Electron] Window failed to load:', errorCode, errorDescription, validatedURL);
-    const html = `<html><body style="font-family:sans-serif;padding:30px;background:#1e1e1e;color:#fff;">
-      <h2 style="color:#ff5555;">Page Load Failure (${errorCode})</h2>
-      <p><strong>Description:</strong> ${errorDescription}</p>
-      <p><strong>URL:</strong> ${validatedURL}</p>
-    </body></html>`;
-    win.loadURL(`data:text/html,${encodeURIComponent(html)}`);
+    if (!serverStartedSuccessfully) {
+      const errLogPath = path.join(userDataPath, 'server-error.log');
+      const lastLogs = capturedLogs.slice(-50).join('\n');
+      renderCrashPage(mainWindow, serverExitCode, serverExitSignal, lastLogs, errLogPath);
+    }
   });
+
+  if (serverExited) {
+    const errLogPath = path.join(userDataPath, 'server-error.log');
+    const lastLogs = capturedLogs.slice(-50).join('\n');
+    renderCrashPage(mainWindow, serverExitCode, serverExitSignal, lastLogs, errLogPath);
+    return;
+  }
 
   waitForServer(url)
     .then(() => {
+      serverStartedSuccessfully = true;
       console.log(`[Electron] Next.js server ready! Loading ${url}`);
-      win.loadURL(url);
+      mainWindow.loadURL(url);
     })
     .catch((err) => {
-      console.error('[Electron] Server failed to load:', err);
+      console.error('[Electron] Server failed to load or exited:', err);
       const errLogPath = path.join(userDataPath, 'server-error.log');
-      let extraErr = '';
-      if (fs.existsSync(errLogPath)) {
-        extraErr = fs.readFileSync(errLogPath, 'utf8');
-      }
-      const safeMessage = (err.message || String(err)).replace(/</g, '&lt;').replace(/>/g, '&gt;');
-      const safeExtra = extraErr ? extraErr.replace(/</g, '&lt;').replace(/>/g, '&gt;') : 'No server error log recorded.';
-      const htmlContent = `<html><body style="font-family:sans-serif;padding:30px;background:#1e1e1e;color:#fff;">
-        <h2 style="color:#ff5555;">Server Error / Startup Timeout</h2>
-        <p><strong>Message:</strong> ${safeMessage}</p>
-        <hr style="border-color:#444;"/>
-        <h3>Server Startup Error / Trace:</h3>
-        <pre style="color:#ffb86c;background:#282a36;padding:15px;border-radius:5px;white-space:pre-wrap;word-break:break-all;max-height:500px;overflow:auto;">${safeExtra}</pre>
-      </body></html>`;
-      win.loadURL(`data:text/html,${encodeURIComponent(htmlContent)}`);
+      const lastLogs = capturedLogs.slice(-50).join('\n');
+      renderCrashPage(mainWindow, serverExitCode, serverExitSignal, lastLogs, errLogPath);
     });
 }
 
@@ -270,3 +412,4 @@ app.on('before-quit', () => {
   isQuitting = true;
   stopNextServer();
 });
+
