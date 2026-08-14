@@ -4,6 +4,8 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUserRole } from "@/lib/auth-utils";
 import { Button } from "@/components/ui/button";
 import { computeAge } from "@/lib/utils";
+import { DeleteConfirmButton } from "@/components/common/DeleteConfirmButton";
+import { deletePatient } from "@/app/actions/patient";
 
 export const dynamic = "force-dynamic";
 
@@ -53,6 +55,14 @@ function PatientRow({ patient }: { patient: any }) {
             <Pencil className="h-3.5 w-3.5" />
             Edit
           </Link>
+          <DeleteConfirmButton
+            id={patient.id}
+            title="Delete Patient"
+            itemName={`patient "${patient.name}" (${patient.mrn})`}
+            description={`Are you sure you want to delete patient "${patient.name}" (${patient.mrn})? Patients with linked medical or billing history cannot be deleted.`}
+            onDelete={deletePatient}
+            iconOnly={false}
+          />
         </div>
       </td>
     </tr>

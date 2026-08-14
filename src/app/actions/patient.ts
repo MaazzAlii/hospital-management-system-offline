@@ -113,3 +113,79 @@ export async function updatePatient(id: string, data: {
     };
   }
 }
+
+export async function deletePatient(id: string) {
+  try {
+    const { user, role } = await getCurrentUserRole();
+    if (!hasAccess(role, 'patients', 'delete') && !hasAccess(role, 'patients', 'write')) {
+      throw new Error("Unauthorized to delete patients");
+    }
+
+    const patient = await prisma.patient.findUnique({
+      where: { id },
+      include: {
+        _count: {
+          select: {
+            appointments: true,
+            opdVisits: true,
+            sales: true,
+            labOrders: true,
+            invoices: true,
+          },
+        },
+      },
+    });
+
+    if (!patient) {
+      return { success: false, error: "Patient not found" };
+    }
+
+    // Check linked counts
+    const linked = patient._count;
+    const reasons: string[] = [];
+
+    if (linked.appointments > 0) reasons.push(`${linked.appointments} appointment${linked.appointments > 1 ? 's' : ''}`);
+    if (linked.opdVisits > 0) reasons.push(`${linked.opdVisits} OPD visit${linked.opdVisits > 1 ? 's' : ''}`);
+    if (linked.sales > 0) reasons.push(`${linked.sales} pharmacy sale${linked.sales > 1 ? 's' : ''}`);
+    if (linked.labOrders > 0) reasons.push(`${linked.labOrders} lab order${linked.labOrders > 1 ? 's' : ''}`);
+    if (linked.invoices > 0) reasons.push(`${linked.invoices} invoice${linked.invoices > 1 ? 's' : ''}`);
+
+    if (reasons.length > 0) {
+      return {
+        success: false,
+        error: `Cannot delete patient "${patient.name}" (${patient.mrn}) — this patient has ${reasons.join(', ')} linked. Remove those first, or contact an admin.`,
+      };
+    }
+
+    // Safe to delete
+    await prisma.patient.delete({
+      where: { id },
+    });
+
+    // Record in AuditLog
+    await prisma.auditLog.create({
+      data: {
+        action: "DELETE_PATIENT",
+        module: "patients",
+        userId: user?.id || null,
+        details: {
+          patientId: id,
+          name: patient.name,
+          mrn: patient.mrn,
+          deletedAt: new Date().toISOString(),
+          deletedBy: user?.name || user?.email || "Admin",
+        },
+      },
+    });
+
+    revalidatePath("/patients");
+    return { success: true };
+  } catch (error: unknown) {
+    console.error("Failed to delete patient:", error);
+    return {
+      success: false,
+      error: (error instanceof Error ? error.message : String(error)) || "Failed to delete patient",
+    };
+  }
+}
+

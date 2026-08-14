@@ -12,10 +12,13 @@ import {
   Receipt,
   Plus,
   Stethoscope,
+  Pencil,
 } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserRole } from "@/lib/auth-utils";
 import { hasAccess } from "@/lib/permissions";
+import { DeleteConfirmButton } from "@/components/common/DeleteConfirmButton";
+import { deletePatient } from "@/app/actions/patient";
 
 function computeAge(dobString: string): number {
   const dob = new Date(dobString);
@@ -218,11 +221,32 @@ export default async function PatientDetailPage({
               </div>
             </div>
           </div>
-          <div className="flex items-start gap-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+            {/* Action buttons */}
+            <div className="flex items-center gap-2">
+              <Link href={`/patients/${patient.id}/edit`}>
+                <Button variant="outline" size="sm" className="gap-1.5 text-xs">
+                  <Pencil className="h-3.5 w-3.5" />
+                  Edit Patient
+                </Button>
+              </Link>
+              <DeleteConfirmButton
+                id={patient.id}
+                title="Delete Patient"
+                itemName={`patient "${patient.name}" (${patient.mrn})`}
+                description={`Are you sure you want to delete patient "${patient.name}" (${patient.mrn})? Patients with linked medical or billing history cannot be deleted.`}
+                onDelete={deletePatient}
+                redirectUrl="/patients"
+                variant="outline"
+                size="sm"
+                iconOnly={false}
+              />
+            </div>
+
             {/* QR Code rendering */}
             {qrCodeUrl && (
               <div className="shrink-0 rounded-lg border bg-white p-1 shadow-sm hidden sm:block">
-                <img src={qrCodeUrl} alt="Patient QR Code" className="h-20 w-20" />
+                <img src={qrCodeUrl} alt="Patient QR Code" className="h-16 w-16" />
               </div>
             )}
             <div className="text-xs text-muted-foreground sm:text-right pt-1">

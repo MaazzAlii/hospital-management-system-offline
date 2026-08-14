@@ -3,6 +3,8 @@ import { Plus } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserRole } from "@/lib/auth-utils";
 import { Button } from "@/components/ui/button";
+import { DeleteConfirmButton } from "@/components/common/DeleteConfirmButton";
+import { deleteAppointment } from "@/app/actions/appointment";
 
 export const dynamic = "force-dynamic";
 
@@ -65,14 +67,24 @@ function AppointmentRow({ appt }: { appt: ApptRow }) {
         {appt.notes || "—"}
       </td>
       <td className="px-4 py-3 text-sm">
-        {appt.status === "scheduled" && (
-          <Link
-            href={`/appointments/${appt.id}/visit`}
-            className="inline-flex items-center rounded-md bg-primary px-2.5 py-1.5 text-xs font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 transition-colors whitespace-nowrap"
-          >
-            Start Visit
-          </Link>
-        )}
+        <div className="flex items-center gap-1.5">
+          {appt.status === "scheduled" && (
+            <Link
+              href={`/appointments/${appt.id}/visit`}
+              className="inline-flex items-center rounded-md bg-primary px-2.5 py-1.5 text-xs font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 transition-colors whitespace-nowrap"
+            >
+              Start Visit
+            </Link>
+          )}
+          <DeleteConfirmButton
+            id={appt.id}
+            title="Delete Appointment"
+            itemName={`appointment for ${appt.patient.name} (${date})`}
+            description={`Are you sure you want to delete this appointment for ${appt.patient.name} on ${date} at ${time}? Appointments with linked OPD visits or invoices cannot be deleted.`}
+            onDelete={deleteAppointment}
+            iconOnly={false}
+          />
+        </div>
       </td>
     </tr>
   );

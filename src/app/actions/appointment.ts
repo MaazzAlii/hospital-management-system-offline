@@ -132,3 +132,82 @@ export async function getAppointmentsWithDetails(query?: string) {
     },
   }));
 }
+
+export async function deleteAppointment(id: string) {
+  try {
+    const { user, role } = await getCurrentUserRole();
+    if (!hasAccess(role, 'appointments', 'delete') && !hasAccess(role, 'appointments', 'write')) {
+      throw new Error("Unauthorized to delete appointments");
+    }
+
+    const appt = await prisma.appointment.findUnique({
+      where: { id },
+      include: {
+        patient: true,
+        doctor: {
+          include: {
+            user: true,
+          },
+        },
+        _count: {
+          select: {
+            opdVisits: true,
+          },
+        },
+      },
+    });
+
+    if (!appt) {
+      return { success: false, error: "Appointment not found" };
+    }
+
+    // Role check for doctors: doctors can only delete their own appointments
+    if (role?.toLowerCase() === 'doctor') {
+      const currentDoctorId = await getCurrentDoctorId();
+      if (!currentDoctorId || appt.doctorId !== currentDoctorId) {
+        throw new Error("Unauthorized: Doctors can only delete their own appointments");
+      }
+    }
+
+    // Check linked OPD visits
+    if (appt._count.opdVisits > 0) {
+      return {
+        success: false,
+        error: `Cannot delete appointment for ${appt.patient?.name || 'patient'} — an OPD Clinical Visit is already linked to this appointment. Remove the visit first, or contact an admin.`,
+      };
+    }
+
+    // Safe to delete
+    await prisma.appointment.delete({
+      where: { id },
+    });
+
+    // Record in AuditLog
+    await prisma.auditLog.create({
+      data: {
+        action: "DELETE_APPOINTMENT",
+        module: "appointments",
+        userId: user?.id || null,
+        details: {
+          appointmentId: id,
+          patientId: appt.patientId,
+          patientName: appt.patient?.name,
+          doctorName: appt.doctor?.user?.name,
+          scheduledAt: appt.scheduledAt.toISOString(),
+          deletedAt: new Date().toISOString(),
+          deletedBy: user?.name || user?.email || "Admin",
+        },
+      },
+    });
+
+    revalidatePath("/appointments");
+    return { success: true };
+  } catch (error: unknown) {
+    console.error("Failed to delete appointment:", error);
+    return {
+      success: false,
+      error: (error instanceof Error ? error.message : String(error)) || "Failed to delete appointment",
+    };
+  }
+}
+

@@ -472,3 +472,4 @@ model ReferenceRange {
   textRange     String?
   createdAt     DateTime @default(now())
 }
+
