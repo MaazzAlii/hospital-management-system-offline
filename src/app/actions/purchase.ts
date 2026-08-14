@@ -89,6 +89,11 @@ export async function createPurchase(data: {
       if (data.items && data.items.length > 0) {
         for (const item of data.items) {
           const price = item.unitPrice ?? item.inPrice ?? 0;
+          const defaultExp = new Date();
+          defaultExp.setFullYear(defaultExp.getFullYear() + 1);
+          const expDate = item.expiryDate ? new Date(item.expiryDate) : defaultExp;
+          const batchCode = item.batchNo?.trim() || `B-${Date.now().toString().slice(-6)}`;
+
           const createdItem = await tx.purchaseItem.create({
             data: {
               purchaseId: createdPurchase.id,
@@ -96,8 +101,19 @@ export async function createPurchase(data: {
               quantity: item.quantity,
               unitPrice: price,
               totalPrice: price * item.quantity,
-              batchNo: item.batchNo || null,
-              expiryDate: item.expiryDate ? new Date(item.expiryDate) : null,
+              batchNo: batchCode,
+              expiryDate: expDate,
+            },
+          });
+
+          await tx.batch.create({
+            data: {
+              medicineId: item.medicineId,
+              purchaseItemId: createdItem.id,
+              batchNo: batchCode,
+              expiryDate: expDate,
+              quantityReceived: item.quantity,
+              quantityRemaining: item.quantity,
             },
           });
 
@@ -175,6 +191,11 @@ export async function updatePurchase(
           const itemTotal = price * item.quantity;
           newTotal += itemTotal;
 
+          const defaultExp = new Date();
+          defaultExp.setFullYear(defaultExp.getFullYear() + 1);
+          const expDate = item.expiryDate ? new Date(item.expiryDate) : defaultExp;
+          const batchCode = item.batchNo?.trim() || `B-${Date.now().toString().slice(-6)}`;
+
           const createdItem = await tx.purchaseItem.create({
             data: {
               purchaseId: id,
@@ -182,8 +203,19 @@ export async function updatePurchase(
               quantity: item.quantity,
               unitPrice: price,
               totalPrice: itemTotal,
-              batchNo: item.batchNo || null,
-              expiryDate: item.expiryDate ? new Date(item.expiryDate) : null,
+              batchNo: batchCode,
+              expiryDate: expDate,
+            },
+          });
+
+          await tx.batch.create({
+            data: {
+              medicineId: item.medicineId,
+              purchaseItemId: createdItem.id,
+              batchNo: batchCode,
+              expiryDate: expDate,
+              quantityReceived: item.quantity,
+              quantityRemaining: item.quantity,
             },
           });
 

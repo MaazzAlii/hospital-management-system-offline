@@ -95,12 +95,42 @@ export async function getMedicines(query?: string) {
         stockMovements: {
           select: { quantity: true },
         },
+        batches: {
+          where: {
+            quantityRemaining: { gt: 0 },
+          },
+          orderBy: { expiryDate: "asc" },
+        },
       },
       orderBy: { name: "asc" },
     });
 
+    const now = new Date();
+    const ninetyDaysFromNow = new Date();
+    ninetyDaysFromNow.setDate(ninetyDaysFromNow.getDate() + 90);
+
     return rawMedicines.map((m) => {
       const currentStock = m.stockMovements.reduce((sum, sm) => sum + sm.quantity, 0);
+      const batches = m.batches.map((b) => {
+        const expDate = new Date(b.expiryDate);
+        let expiryStatus: 'expired' | 'expiring_soon' | 'valid' = 'valid';
+        if (expDate < now) {
+          expiryStatus = 'expired';
+        } else if (expDate <= ninetyDaysFromNow) {
+          expiryStatus = 'expiring_soon';
+        }
+
+        return {
+          id: b.id,
+          batchNo: b.batchNo,
+          expiryDate: b.expiryDate,
+          quantityReceived: b.quantityReceived,
+          quantityRemaining: b.quantityRemaining,
+          expiryStatus,
+          isExpired: expiryStatus === 'expired',
+        };
+      });
+
       return {
         id: m.id,
         name: m.name,
@@ -113,6 +143,7 @@ export async function getMedicines(query?: string) {
         reorderLevel: m.reorderLevel,
         isLowStock: currentStock <= m.reorderLevel,
         isActive: true,
+        batches,
       };
     });
   } catch (error: unknown) {
