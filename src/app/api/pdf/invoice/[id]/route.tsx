@@ -37,7 +37,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       return new NextResponse('Invoice / Sale record not found', { status: 404 });
     }
 
-    const docNo = targetDoc.saleNo || targetDoc.invoiceNo || 'INV';
+    const doc = targetDoc as any;
+    const docNo = doc.saleNo || doc.invoiceNo || 'INV';
     const url = new URL(request.url);
     const logoUrl = `${url.protocol}//${url.host}/logo.jpeg`;
 

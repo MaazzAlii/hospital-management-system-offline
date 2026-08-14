@@ -234,10 +234,11 @@ export function SaleForm({
     }
   }, [items])
 
-  const handlePatientSelect = (val: string) => {
-    setPatientId(val)
-    if (val !== 'walk-in') {
-      const p = patients.find((pat) => pat.id === val)
+  const handlePatientSelect = (val: string | null) => {
+    const selected = val || 'walk-in'
+    setPatientId(selected)
+    if (selected !== 'walk-in') {
+      const p = patients.find((pat) => pat.id === selected)
       if (p) {
         setCustomerName(p.name || `${p.firstName || ''} ${p.lastName || ''}`.trim())
         setCustomerPhone(p.phone || '')
@@ -376,7 +377,7 @@ export function SaleForm({
               <Label htmlFor="patientSelect" className="text-xs font-medium text-muted-foreground">
                 Customer / Patient Profile
               </Label>
-              <Select value={patientId} onValueChange={handlePatientSelect}>
+              <Select value={patientId} onValueChange={(val) => handlePatientSelect(val)}>
                 <SelectTrigger id="patientSelect">
                   <SelectValue placeholder="Select patient / customer" />
                 </SelectTrigger>
@@ -592,7 +593,7 @@ export function SaleForm({
                   </tr>
                 </thead>
                 <tbody className="divide-y">
-                  {items.map((item, index) => {
+                  {items.map((item) => {
                     const selectedMed = medicines.find((m) => m.id === item.medicineId)
                     const availableBatches = selectedMed?.batches || []
                     const isExceeding =
@@ -611,7 +612,7 @@ export function SaleForm({
                         <td className="p-2.5">
                           <Select
                             value={item.medicineId}
-                            onValueChange={(val) => handleMedicineChange(item.id, val)}
+                            onValueChange={(val) => handleMedicineChange(item.id, val || '')}
                           >
                             <SelectTrigger className="h-8 text-xs">
                               <SelectValue placeholder="Select medicine..." />
@@ -637,7 +638,7 @@ export function SaleForm({
                             <div className="space-y-1">
                               <Select
                                 value={item.batchId}
-                                onValueChange={(val) => handleBatchChange(item.id, val)}
+                                onValueChange={(val) => handleBatchChange(item.id, val || '')}
                               >
                                 <SelectTrigger className="h-8 text-xs">
                                   <SelectValue placeholder="Select Batch..." />
