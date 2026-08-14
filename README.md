@@ -19,16 +19,32 @@ A production-grade, offline-first Hospital Management System (HMS) designed and 
 
 ## 🌟 Core Modules & Capabilities
 
-### 1. 🏥 Patient Management & Electronic Health Records (EHR)
+### 1. 📊 Interactive Earnings Dashboard with Time Filters
+- Real-time financial analytics widget with time period switches:
+  - **Daily**: Earnings for any specific selected day.
+  - **Weekly**: Earnings aggregated across the week (Monday to Sunday).
+  - **Monthly**: Current and historical monthly revenue summaries.
+  - **Yearly**: Annual fiscal totals.
+- Synchronized metric cards: **Total Revenue**, **Pharmacy Sales Revenue** (with sales transaction count), and **Clinic Invoices Revenue** (with paid/partial count).
+
+### 2. 🏥 Patient Management, EHR & Safe Deletion
 - Unique **Medical Record Number (MRN)** generation per patient (`LCC-YYYY-XXXX`).
 - Full demographic records, emergency contacts, blood group, phone, and residential address tracking.
 - OPD Visit logs with vital signs, clinical symptoms, diagnosis, doctor prescription notes, and appointment history.
+- **Scoped Safe Deletion**:
+  - Unlinked test/temporary patients can be deleted immediately.
+  - Deletion is strictly blocked if the patient has linked medical or financial records (Appointments, OPD Visits, Sales, Lab Orders, or Invoices) with a clear explanation of linked counts.
+  - All deletions are recorded in the `AuditLog` database table.
 
-### 2. 📅 Doctor Scheduling & Appointments
+### 3. 📅 Doctor Scheduling, Appointments & Safe Deletion
 - Doctor profiles with medical specialization, consultation fee, phone, and duty schedules.
 - Multi-slot appointment booking with patient queue status tracking (`scheduled`, `completed`, `cancelled`).
+- **Safe Appointment Deletion**:
+  - Plain appointments without linked clinical visits or invoices can be safely deleted.
+  - Deletion is blocked if an OPD visit or invoice has already been generated from the appointment.
+  - Successful appointment deletions are tracked in `AuditLog`.
 
-### 3. 💊 Pharmacy Sales & Wholesale Distributor Invoicing
+### 4. 💊 Pharmacy Sales & Wholesale Distributor Invoicing
 - **Wholesale Distributor Invoice Format**:
   - Full B2B distributor headers: Account Code, Customer / Consignee Address, Drug License No., NTN No., Summary / PRS No., Order Booker / Booked By, Salesman Mobile, Supplied By, and Territory.
   - Multi-batch line-item pricing: Product Code, Batch No, Expiry Date, Billed Qty, Free Qty, Trade Price, Gross Amount, Discount % & Amount, S.Tax, GST, and Net Invoice Amount.
@@ -41,19 +57,20 @@ A production-grade, offline-first Hospital Management System (HMS) designed and 
 - **Daily Sale Returns**:
   - Dedicated daily return report with date filtering, return breakdown, refund values, and stock restoration to original batches.
 
-### 4. 🧪 Laboratory Information System (LIS)
+### 5. 🧪 Laboratory Information System (LIS)
 - Test directory with test code, sample type (Blood, Serum, Urine), price, and category.
 - Reference ranges per parameter customized by gender and age group.
 - Lab order processing, barcoded sample collection tracking, and test result entry.
 
-### 5. 💳 Billing, Invoices & PDF Printing
+### 6. 💳 Billing, Invoices & PDF Printing
 - Integrated point-of-sale and clinic billing module.
 - Atomically generated invoices linked to OPD consultations, lab tests, and pharmacy sales.
 - Professional, high-resolution PDF invoice generation formatted to wholesale distributor standards.
 
-### 6. 🔒 Role-Based Access Control (RBAC)
+### 7. 🔒 Role-Based Access Control (RBAC) & Audit Logging
 - Role definitions: `Admin`, `Doctor`, `Receptionist`, `Pharmacist`, `Lab Technician`, and `Cashier`.
 - Enforced module-level permissions for Read, Write, Update, Delete, and Discount application.
+- Dedicated `AuditLog` logging user, entity, action, and timestamp for all clinical and administrative deletions.
 
 ---
 
@@ -62,34 +79,43 @@ A production-grade, offline-first Hospital Management System (HMS) designed and 
 ### 01. Secure Login & Role Authentication
 ![Login](docs/screenshots/01-login.png)
 
-### 02. Clinic Overview Dashboard
-![Dashboard](docs/screenshots/02-dashboard.png)
+### 02. Clinic Overview Dashboard & Earnings Analytics (Monthly)
+![Dashboard](docs/screenshots/12-dashboard-earnings-monthly.png)
 
-### 03. Patient Directory & Medical Records
+### 03. Earnings Analytics (Daily & Weekly Views)
+![Daily Earnings](docs/screenshots/13-dashboard-earnings-daily.png)
+![Weekly Earnings](docs/screenshots/14-dashboard-earnings-weekly.png)
+
+### 04. Patient Directory & Medical Records
 ![Patients](docs/screenshots/03-patients.png)
 
-### 04. Doctor Appointments & OPD Queue
-![Appointments](docs/screenshots/04-appointments.png)
+### 05. Safe Patient Deletion Modal & Safety Validation Block
+![Patient Delete Modal](docs/screenshots/16-patient-delete-modal.png)
+![Patient Delete Blocked](docs/screenshots/17-patient-delete-blocked.png)
 
-### 05. Pharmacy Medicines Inventory & Batch Stock
+### 06. Doctor Appointments & Safe Deletion
+![Appointments](docs/screenshots/04-appointments.png)
+![Appointment Delete Modal](docs/screenshots/18-appointment-delete-modal.png)
+
+### 07. Pharmacy Medicines Inventory & Batch Stock
 ![Pharmacy](docs/screenshots/05-pharmacy.png)
 
-### 06. Wholesale Distributor Invoice & Sale Form
+### 08. Wholesale Distributor Invoice & Sale Form
 ![Distributor Sale Form](docs/screenshots/06-distributor-sale-new.png)
 
-### 07. Sales History & Invoices Directory
+### 09. Sales History & Invoices Directory
 ![Sales History](docs/screenshots/07-sales-history.png)
 
-### 08. Daily Sale Returns & Stock Restorations
+### 10. Daily Sale Returns & Stock Restorations
 ![Daily Returns](docs/screenshots/08-daily-returns.png)
 
-### 09. Expiry Report & Stock Safety Audit
+### 11. Expiry Report & Stock Safety Audit
 ![Expiry Report](docs/screenshots/09-expiry-report.png)
 
-### 10. Laboratory Tests & Diagnostic Orders
+### 12. Laboratory Tests & Diagnostic Orders
 ![Lab Module](docs/screenshots/10-lab.png)
 
-### 11. Clinic Billing & Payment Invoicing
+### 13. Clinic Billing & Payment Invoicing
 ![Billing](docs/screenshots/11-billing.png)
 
 ---
