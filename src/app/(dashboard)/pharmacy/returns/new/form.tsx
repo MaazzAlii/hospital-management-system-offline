@@ -91,7 +91,7 @@ export function ReturnForm() {
     
     try {
       await processReturn(saleData.id, itemsToReturn)
-      router.push('/pharmacy/medicines')
+      router.push('/pharmacy/returns')
       router.refresh()
     } catch (err: any) {
       console.error(err)
