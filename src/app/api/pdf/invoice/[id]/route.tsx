@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { renderToStream } from '@react-pdf/renderer';
 import { InvoicePDF } from '@/components/pdf/InvoicePDF';
 import { getInvoiceById, getClinicSettings } from '@/app/actions/billing';
+import { getSaleById } from '@/app/actions/sale';
 import { getCurrentUserRole } from '@/lib/auth-utils';
 import { hasAccess } from '@/lib/permissions';
 import React from 'react';
@@ -17,26 +18,32 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       return new NextResponse('Unauthorized', { status: 401 });
     }
 
-    if (!hasAccess(role, 'billing', 'read')) {
+    if (!hasAccess(role, 'billing', 'read') && !hasAccess(role, 'pharmacy', 'read')) {
       return new NextResponse('Forbidden', { status: 403 });
     }
 
     const resolvedParams = await params;
-    const [invoice, settings] = await Promise.all([
+    
+    // First try fetching as a Sale (for rich distributor format), otherwise as an Invoice
+    const [sale, invoice, settings] = await Promise.all([
+      getSaleById(resolvedParams.id),
       getInvoiceById(resolvedParams.id),
-      getClinicSettings()
+      getClinicSettings(),
     ]);
 
-    if (!invoice) {
-      return new NextResponse('Invoice not found', { status: 404 });
+    const targetDoc = sale || invoice;
+
+    if (!targetDoc) {
+      return new NextResponse('Invoice / Sale record not found', { status: 404 });
     }
 
+    const docNo = targetDoc.saleNo || targetDoc.invoiceNo || 'INV';
     const url = new URL(request.url);
     const logoUrl = `${url.protocol}//${url.host}/logo.jpeg`;
 
     // Render the React-PDF component to a Node stream
     const pdfStream = await renderToStream(
-      <InvoicePDF invoice={invoice} settings={settings} logoUrl={logoUrl} />
+      <InvoicePDF invoice={targetDoc} settings={settings} logoUrl={logoUrl} />
     );
 
     // Convert the Node stream to a Web ReadableStream
@@ -45,13 +52,13 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         pdfStream.on('data', (chunk) => controller.enqueue(chunk));
         pdfStream.on('end', () => controller.close());
         pdfStream.on('error', (err) => controller.error(err));
-      }
+      },
     });
 
     return new NextResponse(readableStream, {
       headers: {
         'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename="Invoice-${invoice.invoiceNo}.pdf"`,
+        'Content-Disposition': `inline; filename="Invoice-${docNo}.pdf"`,
       },
     });
   } catch (error) {
