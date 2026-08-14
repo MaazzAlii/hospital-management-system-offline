@@ -1,11 +1,16 @@
 import { Users, Calendar, Stethoscope, CreditCard, Clock } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserRole } from "@/lib/auth-utils";
+import { getEarningsData } from "@/app/actions/earnings";
+import { EarningsDashboardSection } from "@/components/dashboard/EarningsDashboardSection";
 
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
   await getCurrentUserRole();
+
+  // Initial Monthly Earnings Data
+  const initialEarnings = await getEarningsData("monthly");
 
   // ── Stats ──────────────────────────────────────────────────────────
 
@@ -188,6 +193,9 @@ export default async function DashboardPage() {
           </div>
         ))}
       </div>
+
+      {/* Interactive Earnings & Revenue Analytics Dashboard */}
+      <EarningsDashboardSection initialData={initialEarnings} />
 
       {/* Recent activity */}
       <div className="rounded-xl border bg-card p-5 shadow-sm">
