@@ -1,5 +1,17 @@
 # Task: Fix Phone Input Bug, Admin Delete Override, and Add Standing Workflow Rules
 
+## ✅ Status: COMPLETE (Verified & Packaged on Port 3456)
+
+- [x] **Part A — Phone Number Input Rewrite**: COMPLETED (`8dfa91f`)
+- [x] **Part B — Selectable Country Code Dropdown**: COMPLETED (`8dfa91f`)
+- [x] **Part C — Admin Delete Override & Clear Messages**: COMPLETED (`386df2c`, `6e6bfb0`)
+- [x] **Part D — Collapsible Pharmacy Sidebar Navigation**: COMPLETED (`be401d0`)
+- [x] **Part E — Standing Workflow Rules (`AGENT_WORKFLOW.md`)**: COMPLETED (`AGENT_WORKFLOW.md`)
+- [x] **Build & Verification on Port 3456**: COMPLETED & Screen-verified
+- [x] **Documentation & Screenshot Gallery Updated**: COMPLETED (`6850a0f`, `30f88fd`)
+
+---
+
 ## Part A — Fix the phone number input (critical bug)
 
 Current bug: typing digits produces garbage (e.g. typing "34" shows "929-292929"), and backspace doesn't reliably clear the field. This is very likely caused by the formatting/sanitization logic recomputing from a stale or already-formatted value on every keystroke instead of tracking the raw typed digits as the source of truth.
