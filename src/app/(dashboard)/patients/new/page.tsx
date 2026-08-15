@@ -20,10 +20,15 @@ const patientSchema = z.object({
     .string()
     .min(1, "Phone number is required")
     .refine((val) => {
-      const digits = val.replace(/\D/g, "");
-      const national = digits.startsWith("92") ? digits.slice(2) : (digits.startsWith("0") ? digits.slice(1) : digits);
-      return /^3\d{9}$/.test(national);
-    }, "Enter a valid 10-digit Pakistani mobile number (e.g. 300-1234567)"),
+      const trimmed = val.trim();
+      const digits = trimmed.replace(/\D/g, "");
+      if (trimmed.startsWith("+92") || (!trimmed.startsWith("+") && digits.startsWith("92"))) {
+        const national = digits.startsWith("92") ? digits.slice(2) : (digits.startsWith("0") ? digits.slice(1) : digits);
+        return /^3\d{9}$/.test(national);
+      }
+      // International number validation (at least 7 digits)
+      return digits.length >= 7;
+    }, "Enter a valid phone number (e.g. 300-1234567 for Pakistan)"),
   address: z.string().min(5, "Address must be at least 5 characters"),
   bloodGroup: z.enum(["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-", ""]).optional(),
 });
