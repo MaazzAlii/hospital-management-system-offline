@@ -74,44 +74,53 @@ A production-grade, offline-first Hospital Management System (HMS) designed and 
 
 ---
 
-## 🖼️ Application Screenshots
+## 🖼️ Application Screenshots (Verified on Standalone Port 3456)
 
-### 01. Secure Login & Role Authentication
-![Login](docs/screenshots/01-login.png)
+### 01. Clean Production Login (No Test Accounts)
+![Clean Login](docs/screenshots/live_login_3456.png)
 
-### 02. Clinic Overview Dashboard & Earnings Analytics (Live Monthly Reconciliation)
+### 02. Interactive Notifications Bell & Batch Expiry / Stock Alert Popover
+![Notification Dropdown](docs/screenshots/live_notification_dropdown_3456.png)
+
+### 03. Standardized Pakistani Phone Number Input (+92 Prefix & Live Validation)
+![Pakistani Phone Number Validation](docs/screenshots/live_patient_phone_input_3456.png)
+
+### 04. Wholesale Distributor Invoice & Point of Sale (POS)
+![Pharmacy Sales Phone Inputs](docs/screenshots/live_pharmacy_phone_input_3456.png)
+
+### 05. Supplier Registration with Standardized Pakistani Phone Input
+![Supplier Phone Input](docs/screenshots/live_supplier_phone_input_3456.png)
+
+### 06. Clinic Overview Dashboard & Earnings Analytics (Live Monthly Reconciliation)
 ![Dashboard Earnings](docs/screenshots/dashboard-earnings.png)
 
-### 03. Earnings Analytics (Daily & Weekly Views)
+### 07. Earnings Analytics (Daily & Weekly Views)
 ![Daily Earnings](docs/screenshots/13-dashboard-earnings-daily.png)
 ![Weekly Earnings](docs/screenshots/14-dashboard-earnings-weekly.png)
 
-### 04. Patient Directory & Safe Deletion
+### 08. Patient Directory & Safe Deletion
 ![Patients Directory](docs/screenshots/patient-safe-delete.png)
 
-### 05. Safe Patient Deletion Protection (Blocked Linked Records Validation Toast)
+### 09. Safe Patient Deletion Protection (Blocked Linked Records Validation Toast)
 ![Patient Delete Blocked](docs/screenshots/patient-delete-blocked.png)
 
-### 06. Doctor Appointments & Safe Deletion
+### 10. Doctor Appointments & Safe Deletion
 ![Appointments](docs/screenshots/04-appointments.png)
 ![Appointment Delete Modal](docs/screenshots/18-appointment-delete-modal.png)
 
-### 07. Pharmacy Medicines Inventory & Multi-Batch Stock Tracking
+### 11. Pharmacy Medicines Inventory & Multi-Batch Stock Tracking
 ![Pharmacy Medicines](docs/screenshots/pharmacy-medicines-batches.png)
 
-### 08. Wholesale Distributor Invoice & Point of Sale (POS)
-![Pharmacy Sales](docs/screenshots/pharmacy-sales-pos.png)
-
-### 09. Daily Sale Returns & Batch Stock Restoration
+### 12. Daily Sale Returns & Batch Stock Restoration
 ![Pharmacy Returns](docs/screenshots/pharmacy-returns.png)
 
-### 10. Expiry Report & Stock Safety Audit
+### 13. Expiry Report & Stock Safety Audit
 ![Expiry Report](docs/screenshots/09-expiry-report.png)
 
-### 11. Laboratory Tests & Diagnostic Orders
+### 14. Laboratory Tests & Diagnostic Orders
 ![Lab Module](docs/screenshots/10-lab.png)
 
-### 12. Clinic Billing & Invoices Management
+### 15. Clinic Billing & Invoices Management
 ![Billing Invoices](docs/screenshots/billing-invoices.png)
 
 ---
