@@ -79,44 +79,40 @@ A production-grade, offline-first Hospital Management System (HMS) designed and 
 ### 01. Secure Login & Role Authentication
 ![Login](docs/screenshots/01-login.png)
 
-### 02. Clinic Overview Dashboard & Earnings Analytics (Monthly)
-![Dashboard](docs/screenshots/12-dashboard-earnings-monthly.png)
+### 02. Clinic Overview Dashboard & Earnings Analytics (Live Monthly Reconciliation)
+![Dashboard Earnings](docs/screenshots/dashboard-earnings.png)
 
 ### 03. Earnings Analytics (Daily & Weekly Views)
 ![Daily Earnings](docs/screenshots/13-dashboard-earnings-daily.png)
 ![Weekly Earnings](docs/screenshots/14-dashboard-earnings-weekly.png)
 
-### 04. Patient Directory & Medical Records
-![Patients](docs/screenshots/03-patients.png)
+### 04. Patient Directory & Safe Deletion
+![Patients Directory](docs/screenshots/patient-safe-delete.png)
 
-### 05. Safe Patient Deletion Modal & Safety Validation Block
-![Patient Delete Modal](docs/screenshots/16-patient-delete-modal.png)
-![Patient Delete Blocked](docs/screenshots/17-patient-delete-blocked.png)
+### 05. Safe Patient Deletion Protection (Blocked Linked Records Validation Toast)
+![Patient Delete Blocked](docs/screenshots/patient-delete-blocked.png)
 
 ### 06. Doctor Appointments & Safe Deletion
 ![Appointments](docs/screenshots/04-appointments.png)
 ![Appointment Delete Modal](docs/screenshots/18-appointment-delete-modal.png)
 
-### 07. Pharmacy Medicines Inventory & Batch Stock
-![Pharmacy](docs/screenshots/05-pharmacy.png)
+### 07. Pharmacy Medicines Inventory & Multi-Batch Stock Tracking
+![Pharmacy Medicines](docs/screenshots/pharmacy-medicines-batches.png)
 
-### 08. Wholesale Distributor Invoice & Sale Form
-![Distributor Sale Form](docs/screenshots/06-distributor-sale-new.png)
+### 08. Wholesale Distributor Invoice & Point of Sale (POS)
+![Pharmacy Sales](docs/screenshots/pharmacy-sales-pos.png)
 
-### 09. Sales History & Invoices Directory
-![Sales History](docs/screenshots/07-sales-history.png)
+### 09. Daily Sale Returns & Batch Stock Restoration
+![Pharmacy Returns](docs/screenshots/pharmacy-returns.png)
 
-### 10. Daily Sale Returns & Stock Restorations
-![Daily Returns](docs/screenshots/08-daily-returns.png)
-
-### 11. Expiry Report & Stock Safety Audit
+### 10. Expiry Report & Stock Safety Audit
 ![Expiry Report](docs/screenshots/09-expiry-report.png)
 
-### 12. Laboratory Tests & Diagnostic Orders
+### 11. Laboratory Tests & Diagnostic Orders
 ![Lab Module](docs/screenshots/10-lab.png)
 
-### 13. Clinic Billing & Payment Invoicing
-![Billing](docs/screenshots/11-billing.png)
+### 12. Clinic Billing & Invoices Management
+![Billing Invoices](docs/screenshots/billing-invoices.png)
 
 ---
 
