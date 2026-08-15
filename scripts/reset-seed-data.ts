@@ -17,7 +17,6 @@ import path from 'path';
 import fs from 'fs';
 import { PrismaClient } from '../src/generated/prisma';
 import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3';
-import Database from 'better-sqlite3';
 
 const rootDbPath = path.resolve(__dirname, '..', 'hms.db');
 
@@ -38,8 +37,8 @@ console.log('TARGET DATABASE FILE:');
 console.log(rootDbPath);
 console.log('=============================================================');
 
-const sqlite = new Database(rootDbPath);
-const adapter = new PrismaBetterSqlite3(sqlite);
+const dbUrl = `file:${rootDbPath.replace(/\\/g, '/')}`;
+const adapter = new PrismaBetterSqlite3({ url: dbUrl });
 const prisma = new PrismaClient({ adapter });
 
 async function resetSeedDatabase() {
@@ -149,5 +148,4 @@ resetSeedDatabase()
   })
   .finally(async () => {
     await prisma.$disconnect();
-    sqlite.close();
   });
