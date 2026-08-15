@@ -115,41 +115,44 @@ A production-grade, offline-first Hospital Management System (HMS) designed and 
 ![Book New Appointment](docs/screenshots/17-appointment-new.png)
 
 ### 10. OPD Clinical Consultations & Prescriptions
-![OPD Visits Directory](docs/screenshots/19-opd-visits-list.png)
-![New OPD Consultation Form](docs/screenshots/20-opd-visit-new.png)
+![OPD Visits Directory](docs/screenshots/47-opd-visits-directory.png)
+![OPD Consultation Form](docs/screenshots/48-opd-consultation-form-filled.png)
+![OPD Consultation Details](docs/screenshots/49-opd-visit-details-view.png)
+![OPD Edit Consultation](docs/screenshots/50-opd-visit-edit-form.png)
 
 ### 11. Pharmacy Inventory, Multi-Batch Stock & Expiry Badges
-![Pharmacy Inventory Batches](docs/screenshots/21-pharmacy-medicines-batches.png)
-![Add Medicine Form](docs/screenshots/22-pharmacy-medicine-new.png)
+![Pharmacy Inventory Batches](docs/screenshots/51-pharmacy-medicines-inventory.png)
+![Add Medicine Form](docs/screenshots/52-pharmacy-add-medicine-form.png)
 
-### 12. Wholesale Distributor Invoicing / POS
-![Wholesale Distributor Sale POS](docs/screenshots/23-pharmacy-distributor-sale-new.png)
-![Sales & Invoices History](docs/screenshots/24-pharmacy-sales-history.png)
+### 12. Pharmacy Suppliers & Inward Stock Purchases (GRN)
+![Suppliers Directory](docs/screenshots/53-pharmacy-suppliers-list.png)
+![Add Supplier Form](docs/screenshots/54-pharmacy-add-supplier-form.png)
+![New Purchase Entry](docs/screenshots/55-pharmacy-purchases-grn-new.png)
+![Purchases Directory](docs/screenshots/56-pharmacy-purchases-list.png)
 
-### 13. Daily Sale Returns & Batch Stock Restoration
-![Daily Returns Report](docs/screenshots/25-pharmacy-daily-returns.png)
-![Process Return Form](docs/screenshots/26-pharmacy-return-new.png)
+### 13. Wholesale Distributor POS & Sales History
+![Wholesale Distributor Sale POS](docs/screenshots/57-pharmacy-sales-pos-form.png)
+![Sales & Invoices History](docs/screenshots/58-pharmacy-sales-history-list.png)
 
-### 14. Medicine Expiry Risk Report & Safety Audit
-![Expiry Report](docs/screenshots/27-pharmacy-expiry-report.png)
+### 14. Daily Sale Returns & Batch Stock Restoration
+![Daily Returns Report](docs/screenshots/59-pharmacy-returns-dashboard.png)
+![Process Return Form](docs/screenshots/60-pharmacy-process-return-form.png)
 
-### 15. Medicine Suppliers & Stock Purchases (GRN)
-![Suppliers Directory](docs/screenshots/28-pharmacy-suppliers-list.png)
-![Add Supplier Form](docs/screenshots/29-pharmacy-supplier-new.png)
-![Purchases Directory](docs/screenshots/30-pharmacy-purchases-list.png)
-![New Purchase Entry](docs/screenshots/31-pharmacy-purchase-new.png)
+### 15. Medicine Expiry Risk Report & Safety Audit
+![Expiry Report](docs/screenshots/61-pharmacy-expiry-risk-report.png)
 
 ### 16. Laboratory Information System (LIS) Tests & Orders
-![Lab Tests Directory](docs/screenshots/32-lab-tests-list.png)
-![Add Lab Test Form](docs/screenshots/33-lab-test-new.png)
-![Lab Orders Processing](docs/screenshots/34-lab-orders-list.png)
-![Create Lab Order Form](docs/screenshots/35-lab-order-new.png)
+![Lab Tests Directory](docs/screenshots/62-lab-tests-directory.png)
+![Add Lab Test Form](docs/screenshots/63-lab-add-test-form.png)
+![Lab Orders Processing](docs/screenshots/64-lab-orders-list.png)
+![Create Lab Order Form](docs/screenshots/65-lab-create-order-form.png)
 
 ### 17. Hospital Billing & Invoices Management
-![Billing Invoices](docs/screenshots/36-billing-invoices-list.png)
+![Billing Invoices](docs/screenshots/66-billing-invoices-list.png)
 
 ### 18. System Settings & Clinic Profile
-![Settings & Clinic Profile](docs/screenshots/37-settings-profile.png)
+![Settings & Clinic Profile](docs/screenshots/67-settings-clinic-profile.png)
+![Administrator User Profile](docs/screenshots/68-settings-user-profile.png)
 
 ---
 
