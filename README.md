@@ -74,54 +74,72 @@ A production-grade, offline-first Hospital Management System (HMS) designed and 
 
 ---
 
-## 🖼️ Application Screenshots (Verified on Standalone Port 3456)
+## 🖼️ Application Screenshots & Feature Walkthrough (Verified on Port 3456)
 
 ### 01. Clean Production Login (No Test Accounts)
-![Clean Login](docs/screenshots/live_login_3456.png)
+![Clean Login](docs/screenshots/01-login.png)
 
-### 02. Interactive Notifications Bell & Batch Expiry / Stock Alert Popover
-![Notification Dropdown](docs/screenshots/live_notification_dropdown_3456.png)
+### 02. Clinic Overview Dashboard & Real-Time Metrics
+![Dashboard Overview](docs/screenshots/02-dashboard-overview.png)
 
-### 03. Standardized Pakistani Phone Number Input (+92 Prefix & Live Validation)
-![Pakistani Phone Number Validation](docs/screenshots/live_patient_phone_input_3456.png)
+### 03. Interactive Notification Bell & Batch Expiry / Low-Stock Alerts
+![Notification Dropdown](docs/screenshots/03-dashboard-notifications.png)
 
-### 04. Wholesale Distributor Invoice & Point of Sale (POS)
-![Pharmacy Sales Phone Inputs](docs/screenshots/live_pharmacy_phone_input_3456.png)
+### 04. Financial Analytics: Monthly, Daily, Weekly & Yearly Earnings Views
+![Monthly Earnings](docs/screenshots/04-dashboard-earnings-monthly.png)
+![Daily Earnings](docs/screenshots/05-dashboard-earnings-daily.png)
+![Weekly Earnings](docs/screenshots/06-dashboard-earnings-weekly.png)
+![Yearly Earnings](docs/screenshots/07-dashboard-earnings-yearly.png)
 
-### 05. Supplier Registration with Standardized Pakistani Phone Input
-![Supplier Phone Input](docs/screenshots/live_supplier_phone_input_3456.png)
+### 05. Patients Management & Standardized Pakistani Phone Number Input (+92)
+![Patients Directory](docs/screenshots/08-patients-list.png)
+![Register Patient with Phone Validation](docs/screenshots/09-patient-register-phone-validation.png)
+![Patient Profile & Medical History](docs/screenshots/10-patient-details.png)
 
-### 06. Clinic Overview Dashboard & Earnings Analytics (Live Monthly Reconciliation)
-![Dashboard Earnings](docs/screenshots/dashboard-earnings.png)
+### 06. Doctors Directory & Registration
+![Doctors Directory](docs/screenshots/13-doctors-list.png)
+![Add New Doctor](docs/screenshots/14-doctor-new.png)
 
-### 07. Earnings Analytics (Daily & Weekly Views)
-![Daily Earnings](docs/screenshots/13-dashboard-earnings-daily.png)
-![Weekly Earnings](docs/screenshots/14-dashboard-earnings-weekly.png)
+### 07. Appointments Management & Scheduling
+![Appointments Queue](docs/screenshots/16-appointments-list.png)
+![Book New Appointment](docs/screenshots/17-appointment-new.png)
 
-### 08. Patient Directory & Safe Deletion
-![Patients Directory](docs/screenshots/patient-safe-delete.png)
+### 08. OPD Clinical Consultations & Prescriptions
+![OPD Visits Directory](docs/screenshots/19-opd-visits-list.png)
+![New OPD Consultation Form](docs/screenshots/20-opd-visit-new.png)
 
-### 09. Safe Patient Deletion Protection (Blocked Linked Records Validation Toast)
-![Patient Delete Blocked](docs/screenshots/patient-delete-blocked.png)
+### 09. Pharmacy Inventory, Multi-Batch Stock & Expiry Badges
+![Pharmacy Inventory Batches](docs/screenshots/21-pharmacy-medicines-batches.png)
+![Add Medicine Form](docs/screenshots/22-pharmacy-medicine-new.png)
 
-### 10. Doctor Appointments & Safe Deletion
-![Appointments](docs/screenshots/04-appointments.png)
-![Appointment Delete Modal](docs/screenshots/18-appointment-delete-modal.png)
+### 10. Wholesale Distributor Invoicing / POS (+92 Customer & Salesman Contact)
+![Wholesale Distributor Sale POS](docs/screenshots/23-pharmacy-distributor-sale-new.png)
+![Sales & Invoices History](docs/screenshots/24-pharmacy-sales-history.png)
 
-### 11. Pharmacy Medicines Inventory & Multi-Batch Stock Tracking
-![Pharmacy Medicines](docs/screenshots/pharmacy-medicines-batches.png)
+### 11. Daily Sale Returns & Batch Stock Restoration
+![Daily Returns Report](docs/screenshots/25-pharmacy-daily-returns.png)
+![Process Return Form](docs/screenshots/26-pharmacy-return-new.png)
 
-### 12. Daily Sale Returns & Batch Stock Restoration
-![Pharmacy Returns](docs/screenshots/pharmacy-returns.png)
+### 12. Medicine Expiry Risk Report & Safety Audit
+![Expiry Report](docs/screenshots/27-pharmacy-expiry-report.png)
 
-### 13. Expiry Report & Stock Safety Audit
-![Expiry Report](docs/screenshots/09-expiry-report.png)
+### 13. Medicine Suppliers & Stock Purchases (GRN)
+![Suppliers Directory](docs/screenshots/28-pharmacy-suppliers-list.png)
+![Add Supplier with +92 Phone](docs/screenshots/29-pharmacy-supplier-new.png)
+![Purchases Directory](docs/screenshots/30-pharmacy-purchases-list.png)
+![New Purchase Entry](docs/screenshots/31-pharmacy-purchase-new.png)
 
-### 14. Laboratory Tests & Diagnostic Orders
-![Lab Module](docs/screenshots/10-lab.png)
+### 14. Laboratory Information System (LIS) Tests & Orders
+![Lab Tests Directory](docs/screenshots/32-lab-tests-list.png)
+![Add Lab Test Form](docs/screenshots/33-lab-test-new.png)
+![Lab Orders Processing](docs/screenshots/34-lab-orders-list.png)
+![Create Lab Order Form](docs/screenshots/35-lab-order-new.png)
 
-### 15. Clinic Billing & Invoices Management
-![Billing Invoices](docs/screenshots/billing-invoices.png)
+### 15. Hospital Billing & Invoices Management
+![Billing Invoices](docs/screenshots/36-billing-invoices-list.png)
+
+### 16. System Settings & Clinic Profile
+![Settings & Clinic Profile](docs/screenshots/37-settings-profile.png)
 
 ---
 
