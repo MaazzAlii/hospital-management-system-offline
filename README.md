@@ -156,6 +156,37 @@ A production-grade, offline-first Hospital Management System (HMS) designed and 
 
 ---
 
+## ⚡ Installer Optimization & Clean Slate Seed Database
+
+### 📦 Size Optimization (~1.03 GB ➔ ~311.5 MB)
+- **Root Cause Identified**: Dev compiler cache files (`.next/dev`, `.next/cache`) accumulated during development runs were previously bundled by Electron Builder due to overly broad wildcard rules.
+- **Pre-Build Purge Script (`scripts/clean-dev-cache.js`)**: Automatically wipes `.next/dev`, `.next/cache`, `.next/diagnostics`, and `.next/types` prior to Next.js production compilation.
+- **Exclusion Filters in `package.json`**: Explicitly excludes all dev caches, logs, and development artifacts from the final desktop distribution package.
+- **Prisma Engine Optimization**: Configured `binaryTargets = ["native", "windows"]` to bundle only the native Windows engine binaries.
+- **700 MB+ Reduction**: Reduced the output Windows installer (`dist/Life Care HMS Setup 1.0.0.exe`) from **~1.03 GB** down to **~311.5 MB** (~70% reduction).
+
+### 🧹 Database Reset Script (`scripts/reset-seed-data.ts`)
+- Target: Repository root template database (`./hms.db`) packaged into installer distribution.
+- **Wipes All Test/Demo Data**:
+  - Patients, Appointments, OPD Visits, Prescriptions, Sales, Sale Items, Purchases, Stock Movements, Batches, Medicines, Suppliers, Invoices, Payments, Lab Orders, Lab Results, and Audit Logs.
+  - Wipes test doctor profiles (`Sarah Khan`, `John Doe`).
+- **Resets Counter Sequences**: Wipes all sequence records from `Counter` table to ensure first client records start from clean sequence 1 (`MRN-0001`, `INV-0001`, etc.).
+- **Preserves Core Infrastructure**: Retains RBAC structure, roles, permissions, default system settings, main branch, and admin account (`admin@lifecare.com`).
+- **Safety Assertions**: Enforces execution exclusively against project root `./hms.db` to prevent accidental execution against live client data in `%APPDATA%\hms\hms.db`.
+
+### 📸 Clean Slate Verification Screenshots (Packaged Standalone App on Port 3456)
+
+#### 1. Clean Overview Dashboard (0 Patients, 0 Appointments, ₨ 0 Revenue)
+![Clean Dashboard](dashboard_clean_reset.png)
+
+#### 2. Clean Patients Directory (0 Registered Patients)
+![Clean Patients Directory](patients_clean_reset.png)
+
+#### 3. Clean Pharmacy Sales History (0 Sales Records)
+![Clean Sales History](sales_clean_reset.png)
+
+---
+
 ## 🚀 Getting Started & Local Setup
 
 ### Prerequisites
@@ -174,8 +205,8 @@ npx prisma db push
 # 3. Generate Prisma client
 npx prisma generate
 
-# 4. (Optional) Run batch migration & reconciliation
-npx tsx scripts/migrate-batches.ts
+# 4. Reset bundled database to clean slate before building
+npm run db:reset-seed
 
 # 5. Run development server
 npm run dev
@@ -183,10 +214,11 @@ npm run dev
 
 ### Building Desktop Electron App
 ```bash
-# Build standalone offline desktop executable (.exe)
+# Purge dev cache, build Next.js, and package standalone offline desktop installer (~311.5 MB)
 npm run electron:build
 ```
 
 ---
 
 > **Note**: This repository contains offline desktop healthcare management software for private medical clinics.
+
