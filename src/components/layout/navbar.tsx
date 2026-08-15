@@ -17,6 +17,8 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Sidebar } from "./sidebar";
 import { logout } from "@/app/actions/auth";
 
+import { NotificationDropdown } from "./NotificationDropdown";
+
 interface NavbarProps {
   user?: {
     name: string;
@@ -41,12 +43,12 @@ export function Navbar({ user }: NavbarProps) {
     .slice(0, 2);
 
   return (
-    <header className="sticky top-0 z-50 flex h-14 items-center gap-4 border-b bg-card px-4 shadow-sm lg:h-[60px] lg:px-6">
-      {/* Mobile hamburger — opens sidebar in a Sheet */}
+    <header className="sticky top-0 z-40 flex h-14 items-center gap-4 border-b bg-background px-4 lg:px-6">
+      {/* Mobile sidebar trigger */}
       <Sheet>
         <SheetTrigger
           render={
-            <button className="inline-flex items-center justify-center rounded-md border border-input bg-background p-1.5 text-sm shadow-sm md:hidden hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+            <button className="rounded-md p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground md:hidden focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
               <Menu className="h-5 w-5" />
               <span className="sr-only">Toggle navigation menu</span>
             </button>
@@ -64,12 +66,8 @@ export function Navbar({ user }: NavbarProps) {
 
       {/* Right side actions */}
       <div className="flex items-center gap-2">
-        {/* Notification bell */}
-        <Button variant="ghost" size="icon" className="relative">
-          <Bell className="h-5 w-5" />
-          <span className="sr-only">Notifications</span>
-          <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-destructive" />
-        </Button>
+        {/* Dynamic Notification Dropdown */}
+        <NotificationDropdown />
 
         {/* User dropdown */}
         <DropdownMenu>
