@@ -133,9 +133,10 @@ export async function getAppointmentsWithDetails(query?: string) {
   }));
 }
 
-export async function deleteAppointment(id: string) {
+export async function deleteAppointment(id: string, force: boolean = false) {
   try {
     const { user, role } = await getCurrentUserRole();
+    const isAdmin = role?.toLowerCase() === 'admin';
     if (!hasAccess(role, 'appointments', 'delete') && !hasAccess(role, 'appointments', 'write')) {
       throw new Error("Unauthorized to delete appointments");
     }
@@ -169,15 +170,64 @@ export async function deleteAppointment(id: string) {
       }
     }
 
-    // Check linked OPD visits
-    if (appt._count.opdVisits > 0) {
+    const hasLinkedOpd = appt._count.opdVisits > 0;
+
+    // Check linked OPD visits without force
+    if (hasLinkedOpd && !force) {
+      if (isAdmin) {
+        return {
+          success: false,
+          isLinked: true,
+          canOverride: true,
+          error: `Appointment for ${appt.patient?.name || 'patient'} has an OPD Clinical Visit linked. As an Admin, you can choose to override and delete this appointment.`,
+        };
+      }
       return {
         success: false,
-        error: `Cannot delete appointment for ${appt.patient?.name || 'patient'} — an OPD Clinical Visit is already linked to this appointment. Remove the visit first, or contact an admin.`,
+        isLinked: true,
+        canOverride: false,
+        error: `Cannot delete appointment for ${appt.patient?.name || 'patient'} — an OPD Clinical Visit is already linked to this appointment and must be kept for audit purposes.`,
       };
     }
 
-    // Safe to delete
+    // If linked and Admin confirmed force
+    if (hasLinkedOpd && force) {
+      if (!isAdmin) {
+        throw new Error("Unauthorized: Only Admin users can perform an override deletion.");
+      }
+
+      await prisma.$transaction(async (tx) => {
+        // Unlink or delete linked OPD visits
+        await tx.opdVisit.deleteMany({ where: { appointmentId: id } });
+
+        // Delete appointment
+        await tx.appointment.delete({ where: { id } });
+
+        // Record in AuditLog
+        await tx.auditLog.create({
+          data: {
+            action: "APPOINTMENT_ADMIN_OVERRIDE_DELETE",
+            module: "appointments",
+            userId: user?.id || null,
+            details: {
+              appointmentId: id,
+              patientId: appt.patientId,
+              patientName: appt.patient?.name,
+              doctorName: appt.doctor?.user?.name,
+              override: true,
+              scheduledAt: appt.scheduledAt.toISOString(),
+              deletedAt: new Date().toISOString(),
+              deletedBy: user?.name || user?.email || "Admin",
+            },
+          },
+        });
+      });
+
+      revalidatePath("/appointments");
+      return { success: true };
+    }
+
+    // Standard safe deletion
     await prisma.appointment.delete({
       where: { id },
     });

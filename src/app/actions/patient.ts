@@ -114,9 +114,10 @@ export async function updatePatient(id: string, data: {
   }
 }
 
-export async function deletePatient(id: string) {
+export async function deletePatient(id: string, force: boolean = false) {
   try {
     const { user, role } = await getCurrentUserRole();
+    const isAdmin = role?.toLowerCase() === 'admin';
     if (!hasAccess(role, 'patients', 'delete') && !hasAccess(role, 'patients', 'write')) {
       throw new Error("Unauthorized to delete patients");
     }
@@ -150,14 +151,94 @@ export async function deletePatient(id: string) {
     if (linked.labOrders > 0) reasons.push(`${linked.labOrders} lab order${linked.labOrders > 1 ? 's' : ''}`);
     if (linked.invoices > 0) reasons.push(`${linked.invoices} invoice${linked.invoices > 1 ? 's' : ''}`);
 
-    if (reasons.length > 0) {
+    const hasLinkedRecords = reasons.length > 0;
+
+    // If records are linked and force is NOT enabled
+    if (hasLinkedRecords && !force) {
+      if (isAdmin) {
+        return {
+          success: false,
+          isLinked: true,
+          canOverride: true,
+          linkedCounts: linked,
+          error: `Patient "${patient.name}" (${patient.mrn}) has ${reasons.join(', ')} linked. As an Admin, you can choose to override and permanently delete this patient along with all linked records.`,
+        };
+      }
       return {
         success: false,
-        error: `Cannot delete patient "${patient.name}" (${patient.mrn}) — this patient has ${reasons.join(', ')} linked. Remove those first, or contact an admin.`,
+        isLinked: true,
+        canOverride: false,
+        error: `Cannot delete patient "${patient.name}" (${patient.mrn}) — this record has ${reasons.join(', ')} linked and must be kept for audit purposes.`,
       };
     }
 
-    // Safe to delete
+    // If linked records exist and Admin confirmed force delete
+    if (hasLinkedRecords && force) {
+      if (!isAdmin) {
+        throw new Error("Unauthorized: Only Admin users can perform an override deletion.");
+      }
+
+      await prisma.$transaction(async (tx) => {
+        // 1. Lab orders
+        const labOrders = await tx.labOrder.findMany({ where: { patientId: id }, select: { id: true } });
+        const labOrderIds = labOrders.map((o) => o.id);
+        if (labOrderIds.length > 0) {
+          await tx.labResult.deleteMany({ where: { orderId: { in: labOrderIds } } });
+          await tx.sample.deleteMany({ where: { orderId: { in: labOrderIds } } });
+          await tx.labOrderItem.deleteMany({ where: { orderId: { in: labOrderIds } } });
+          await tx.labOrder.deleteMany({ where: { patientId: id } });
+        }
+
+        // 2. Sales
+        const sales = await tx.sale.findMany({ where: { patientId: id }, select: { id: true } });
+        const saleIds = sales.map((s) => s.id);
+        if (saleIds.length > 0) {
+          await tx.saleItem.deleteMany({ where: { saleId: { in: saleIds } } });
+          await tx.sale.deleteMany({ where: { patientId: id } });
+        }
+
+        // 3. OPD Visits
+        await tx.opdVisit.deleteMany({ where: { patientId: id } });
+
+        // 4. Invoices
+        const invoices = await tx.invoice.findMany({ where: { patientId: id }, select: { id: true } });
+        const invoiceIds = invoices.map((i) => i.id);
+        if (invoiceIds.length > 0) {
+          await tx.payment.deleteMany({ where: { invoiceId: { in: invoiceIds } } });
+          await tx.invoiceItem.deleteMany({ where: { invoiceId: { in: invoiceIds } } });
+          await tx.invoice.deleteMany({ where: { patientId: id } });
+        }
+
+        // 5. Appointments
+        await tx.appointment.deleteMany({ where: { patientId: id } });
+
+        // 6. Delete Patient
+        await tx.patient.delete({ where: { id } });
+
+        // 7. AuditLog entry
+        await tx.auditLog.create({
+          data: {
+            action: "PATIENT_ADMIN_OVERRIDE_DELETE",
+            module: "patients",
+            userId: user?.id || null,
+            details: {
+              patientId: id,
+              name: patient.name,
+              mrn: patient.mrn,
+              override: true,
+              deletedCounts: linked,
+              deletedAt: new Date().toISOString(),
+              deletedBy: user?.name || user?.email || "Admin",
+            },
+          },
+        });
+      });
+
+      revalidatePath("/patients");
+      return { success: true };
+    }
+
+    // Standard safe deletion (no linked records)
     await prisma.patient.delete({
       where: { id },
     });
