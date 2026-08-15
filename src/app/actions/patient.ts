@@ -183,9 +183,9 @@ export async function deletePatient(id: string, force: boolean = false) {
         const labOrders = await tx.labOrder.findMany({ where: { patientId: id }, select: { id: true } });
         const labOrderIds = labOrders.map((o) => o.id);
         if (labOrderIds.length > 0) {
-          await tx.labResult.deleteMany({ where: { orderId: { in: labOrderIds } } });
-          await tx.sample.deleteMany({ where: { orderId: { in: labOrderIds } } });
-          await tx.labOrderItem.deleteMany({ where: { orderId: { in: labOrderIds } } });
+          await tx.labResult.deleteMany({ where: { labOrderId: { in: labOrderIds } } });
+          await tx.sample.deleteMany({ where: { labOrderId: { in: labOrderIds } } });
+          await tx.labOrderItem.deleteMany({ where: { labOrderId: { in: labOrderIds } } });
           await tx.labOrder.deleteMany({ where: { patientId: id } });
         }
 
