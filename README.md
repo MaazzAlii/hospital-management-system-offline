@@ -27,24 +27,28 @@ A production-grade, offline-first Hospital Management System (HMS) designed and 
   - **Yearly**: Annual fiscal totals.
 - Synchronized metric cards: **Total Revenue**, **Pharmacy Sales Revenue** (with sales transaction count), and **Clinic Invoices Revenue** (with paid/partial count).
 
-### 2. 🏥 Patient Management, EHR & Safe Deletion
+### 2. 🏥 Patient Management, Country Code Selector & Admin Delete Override
 - Unique **Medical Record Number (MRN)** generation per patient (`LCC-YYYY-XXXX`).
-- Full demographic records, emergency contacts, blood group, phone, and residential address tracking.
-- OPD Visit logs with vital signs, clinical symptoms, diagnosis, doctor prescription notes, and appointment history.
-- **Scoped Safe Deletion**:
-  - Unlinked test/temporary patients can be deleted immediately.
-  - Deletion is strictly blocked if the patient has linked medical or financial records (Appointments, OPD Visits, Sales, Lab Orders, or Invoices) with a clear explanation of linked counts.
-  - All deletions are recorded in the `AuditLog` database table.
+- Full demographic records, emergency contacts, blood group, and residential address tracking.
+- **Enhanced International & National Phone Input**:
+  - Country code dropdown with flags: 🇵🇰 Pakistan (`+92`), 🇸🇦 Saudi Arabia (`+966`), 🇦🇪 UAE (`+971`), 🇬🇧 UK (`+44`), 🇺🇸 US/CA (`+1`), 🇮🇳 India (`+91`), 🇦🇫 Afghanistan (`+93`), 🇴🇲 Oman (`+968`), 🇶🇦 Qatar (`+974`), 🇰🇼 Kuwait (`+965`), 🇧🇭 Bahrain (`+973`), and 🌐 International (`+`).
+  - Single-source-of-truth digit management with auto-prefixing, backspace safety, and responsive formatting.
+- **Admin Delete Override with Cascading Purge**:
+  - Non-admin users are safely blocked if a patient has linked clinical or financial history, with clear audit reasons.
+  - Administrators are granted a dedicated **Admin Delete Override** modal showing an amber/red cascade breakdown (linked appointments, OPD visits, sales, lab orders, and invoices).
+  - Requires explicit confirmation via checkbox (`[x] I understand and confirm force deletion`) before performing an atomic transactional cascade delete.
+  - All override actions are permanently recorded in the `AuditLog` table.
 
 ### 3. 📅 Doctor Scheduling, Appointments & Safe Deletion
 - Doctor profiles with medical specialization, consultation fee, phone, and duty schedules.
 - Multi-slot appointment booking with patient queue status tracking (`scheduled`, `completed`, `cancelled`).
-- **Safe Appointment Deletion**:
-  - Plain appointments without linked clinical visits or invoices can be safely deleted.
-  - Deletion is blocked if an OPD visit or invoice has already been generated from the appointment.
-  - Successful appointment deletions are tracked in `AuditLog`.
+- **Safe & Admin Override Appointment Deletion**:
+  - Plain appointments without linked clinical visits or invoices can be deleted safely.
+  - Linked appointments feature administrative cascade deletion with `AuditLog` tracking.
 
-### 4. 💊 Pharmacy Sales & Wholesale Distributor Invoicing
+### 4. 💊 Grouped Pharmacy Module & Wholesale Invoicing
+- **Collapsible Sidebar Navigation**:
+  - Consolidated sub-modules under an accordion Pharmacy group: Medicines & Inventory, Suppliers, Purchases (GRN), Sales & POS, Daily Returns, and Expiry Risk Reports.
 - **Wholesale Distributor Invoice Format**:
   - Full B2B distributor headers: Account Code, Customer / Consignee Address, Drug License No., NTN No., Summary / PRS No., Order Booker / Booked By, Salesman Mobile, Supplied By, and Territory.
   - Multi-batch line-item pricing: Product Code, Batch No, Expiry Date, Billed Qty, Free Qty, Trade Price, Gross Amount, Discount % & Amount, S.Tax, GST, and Net Invoice Amount.
@@ -85,60 +89,66 @@ A production-grade, offline-first Hospital Management System (HMS) designed and 
 ### 03. Interactive Notification Bell & Batch Expiry / Low-Stock Alerts
 ![Notification Dropdown](docs/screenshots/03-dashboard-notifications.png)
 
-### 04. Financial Analytics: Monthly, Daily, Weekly & Yearly Earnings Views
-![Monthly Earnings](docs/screenshots/04-dashboard-earnings-monthly.png)
-![Daily Earnings](docs/screenshots/05-dashboard-earnings-daily.png)
-![Weekly Earnings](docs/screenshots/06-dashboard-earnings-weekly.png)
-![Yearly Earnings](docs/screenshots/07-dashboard-earnings-yearly.png)
+### 04. Collapsible Pharmacy Navigation in Sidebar
+![Pharmacy Collapsible Nav](docs/screenshots/38-pharmacy-nav-collapsible.png)
 
-### 05. Patients Management & Standardized Pakistani Phone Number Input (+92)
+### 05. Phone Number Input with Selectable Country Code Dropdown
+![Country Code Dropdown](docs/screenshots/39-phone-country-dropdown.png)
+![Saudi Arabia International Phone Format](docs/screenshots/40-phone-sa-international-formatting.png)
+![Pakistan National Phone Format](docs/screenshots/41-phone-pk-national-formatting.png)
+
+### 06. Patients Management & Registration
 ![Patients Directory](docs/screenshots/08-patients-list.png)
-![Register Patient with Phone Validation](docs/screenshots/09-patient-register-phone-validation.png)
-![Patient Profile & Medical History](docs/screenshots/10-patient-details.png)
+![Register Patient Profile](docs/screenshots/42-patient-registered-profile.png)
 
-### 06. Doctors Directory & Registration
+### 07. Admin Delete Override & Cascading Audit Workflow
+![Admin Delete Override Modal](docs/screenshots/44-admin-delete-override-modal.png)
+![Patient Force Deleted Toast](docs/screenshots/45-patient-force-deleted-toast.png)
+![Linked Appointment Cascade Deleted](docs/screenshots/46-appointment-cascade-deleted.png)
+
+### 08. Doctors Directory & Registration
 ![Doctors Directory](docs/screenshots/13-doctors-list.png)
 ![Add New Doctor](docs/screenshots/14-doctor-new.png)
 
-### 07. Appointments Management & Scheduling
+### 09. Appointments Management & Scheduling
 ![Appointments Queue](docs/screenshots/16-appointments-list.png)
 ![Book New Appointment](docs/screenshots/17-appointment-new.png)
 
-### 08. OPD Clinical Consultations & Prescriptions
+### 10. OPD Clinical Consultations & Prescriptions
 ![OPD Visits Directory](docs/screenshots/19-opd-visits-list.png)
 ![New OPD Consultation Form](docs/screenshots/20-opd-visit-new.png)
 
-### 09. Pharmacy Inventory, Multi-Batch Stock & Expiry Badges
+### 11. Pharmacy Inventory, Multi-Batch Stock & Expiry Badges
 ![Pharmacy Inventory Batches](docs/screenshots/21-pharmacy-medicines-batches.png)
 ![Add Medicine Form](docs/screenshots/22-pharmacy-medicine-new.png)
 
-### 10. Wholesale Distributor Invoicing / POS (+92 Customer & Salesman Contact)
+### 12. Wholesale Distributor Invoicing / POS
 ![Wholesale Distributor Sale POS](docs/screenshots/23-pharmacy-distributor-sale-new.png)
 ![Sales & Invoices History](docs/screenshots/24-pharmacy-sales-history.png)
 
-### 11. Daily Sale Returns & Batch Stock Restoration
+### 13. Daily Sale Returns & Batch Stock Restoration
 ![Daily Returns Report](docs/screenshots/25-pharmacy-daily-returns.png)
 ![Process Return Form](docs/screenshots/26-pharmacy-return-new.png)
 
-### 12. Medicine Expiry Risk Report & Safety Audit
+### 14. Medicine Expiry Risk Report & Safety Audit
 ![Expiry Report](docs/screenshots/27-pharmacy-expiry-report.png)
 
-### 13. Medicine Suppliers & Stock Purchases (GRN)
+### 15. Medicine Suppliers & Stock Purchases (GRN)
 ![Suppliers Directory](docs/screenshots/28-pharmacy-suppliers-list.png)
-![Add Supplier with +92 Phone](docs/screenshots/29-pharmacy-supplier-new.png)
+![Add Supplier Form](docs/screenshots/29-pharmacy-supplier-new.png)
 ![Purchases Directory](docs/screenshots/30-pharmacy-purchases-list.png)
 ![New Purchase Entry](docs/screenshots/31-pharmacy-purchase-new.png)
 
-### 14. Laboratory Information System (LIS) Tests & Orders
+### 16. Laboratory Information System (LIS) Tests & Orders
 ![Lab Tests Directory](docs/screenshots/32-lab-tests-list.png)
 ![Add Lab Test Form](docs/screenshots/33-lab-test-new.png)
 ![Lab Orders Processing](docs/screenshots/34-lab-orders-list.png)
 ![Create Lab Order Form](docs/screenshots/35-lab-order-new.png)
 
-### 15. Hospital Billing & Invoices Management
+### 17. Hospital Billing & Invoices Management
 ![Billing Invoices](docs/screenshots/36-billing-invoices-list.png)
 
-### 16. System Settings & Clinic Profile
+### 18. System Settings & Clinic Profile
 ![Settings & Clinic Profile](docs/screenshots/37-settings-profile.png)
 
 ---
