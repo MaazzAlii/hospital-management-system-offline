@@ -10,8 +10,10 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "clean:dev-cache": "node scripts/clean-dev-cache.js",
+    "db:reset-seed": "npx tsx scripts/reset-seed-data.ts",
     "electron:dev": "electron .",
-    "electron:build": "next build && node scripts/copy-prisma-engine.js && node scripts/download-vc-redist.js && electron-builder --win",
+    "electron:build": "node scripts/clean-dev-cache.js && next build && node scripts/copy-prisma-engine.js && node scripts/download-vc-redist.js && electron-builder --win",
     "postinstall": "electron-rebuild -f -w better-sqlite3"
   },
   "build": {
@@ -26,9 +28,19 @@
     "files": [
       "electron/**/*",
       ".next/**/*",
+      "!.next/dev/**/*",
+      "!.next/cache/**/*",
+      "!.next/diagnostics/**/*",
+      "!.next/types/**/*",
       "public/**/*",
       "package.json",
-      "hms.db"
+      "hms.db",
+      "!**/*.log",
+      "!**/*.tmp",
+      "!scripts/**/*",
+      "!docs/**/*",
+      "!tests/**/*",
+      "!*.md"
     ],
     "extraFiles": [
       {
