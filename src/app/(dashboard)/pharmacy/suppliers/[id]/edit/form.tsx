@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, Truck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { updateSupplier } from "@/app/actions/supplier";
+import { PhoneNumberInput } from "@/components/ui/phone-number-input";
 
 const inputClass =
   "w-full rounded-lg border border-input bg-background px-3 py-2 text-sm shadow-sm outline-none ring-offset-background placeholder:text-muted-foreground focus:ring-2 focus:ring-ring transition-colors disabled:opacity-60";
@@ -130,12 +131,10 @@ export default function EditSupplierForm({ supplier }: { supplier: any }) {
             </Field>
 
             <Field label="Phone Number">
-              <input
-                type="text"
+              <PhoneNumberInput
                 value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="e.g. 0343-XXXXXXX"
-                className={inputClass}
+                onChange={(val) => setPhone(val)}
+                placeholder="343-1234567"
               />
             </Field>
 

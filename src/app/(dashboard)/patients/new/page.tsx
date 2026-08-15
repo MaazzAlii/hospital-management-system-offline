@@ -1,14 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useForm } from "react-hook-form";
+import { useState } from "react";
+import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod/v4";
+import { z } from "zod";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ClipboardList } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { createPatient } from "@/app/actions/patient";
+import { PhoneNumberInput } from "@/components/ui/phone-number-input";
 
 // ── Zod schema ────────────────────────────────────────────────────
 const patientSchema = z.object({
@@ -17,8 +18,12 @@ const patientSchema = z.object({
   gender: z.enum(["Male", "Female", "Other"], { error: "Please select a gender" }),
   phone: z
     .string()
-    .min(10, "Phone number must be at least 10 digits")
-    .regex(/^[0-9\-+\s()]+$/, "Invalid phone number format"),
+    .min(1, "Phone number is required")
+    .refine((val) => {
+      const digits = val.replace(/\D/g, "");
+      const national = digits.startsWith("92") ? digits.slice(2) : (digits.startsWith("0") ? digits.slice(1) : digits);
+      return /^3\d{9}$/.test(national);
+    }, "Enter a valid 10-digit Pakistani mobile number (e.g. 300-1234567)"),
   address: z.string().min(5, "Address must be at least 5 characters"),
   bloodGroup: z.enum(["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-", ""]).optional(),
 });
@@ -61,12 +66,13 @@ export default function NewPatientPage() {
 
   const {
     register,
+    control,
     handleSubmit,
     formState: { errors, isSubmitting, isSubmitSuccessful },
     reset,
   } = useForm<PatientFormValues>({
     resolver: zodResolver(patientSchema),
-    defaultValues: { bloodGroup: "" },
+    defaultValues: { bloodGroup: "", phone: "" },
   });
 
   const onSubmit = async (data: PatientFormValues) => {
@@ -165,14 +171,23 @@ export default function NewPatientPage() {
           </Field>
 
           {/* Phone */}
-          <Field label="Phone Number" required error={errors.phone?.message}>
-            <input
-              {...register("phone")}
-              type="tel"
-              placeholder="e.g. 0312-3456789"
-              className={inputClass}
+          <div className="flex flex-col gap-1.5 sm:col-span-2">
+            <label className="text-sm font-medium text-foreground">
+              Phone Number <span className="ml-0.5 text-destructive">*</span>
+            </label>
+            <Controller
+              name="phone"
+              control={control}
+              render={({ field }) => (
+                <PhoneNumberInput
+                  value={field.value}
+                  onChange={field.onChange}
+                  error={errors.phone?.message}
+                  required
+                />
+              )}
             />
-          </Field>
+          </div>
         </div>
 
         {/* Address — full width */}

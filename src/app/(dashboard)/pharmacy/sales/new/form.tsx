@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Trash2, Plus, ArrowLeft, AlertCircle, CheckCircle, Clock, FileText, ShoppingCart } from 'lucide-react'
 import { createSale } from '@/app/actions/sale'
+import { PhoneNumberInput } from '@/components/ui/phone-number-input'
 import Link from 'next/link'
 
 type BatchOption = {
@@ -426,11 +427,12 @@ export function SaleForm({
               <Label htmlFor="customerPhone" className="text-xs font-medium text-muted-foreground">
                 Contact / Mobile No
               </Label>
-              <Input
+              <PhoneNumberInput
                 id="customerPhone"
-                placeholder="e.g. 0300-1234567"
                 value={customerPhone}
-                onChange={(e) => setCustomerPhone(e.target.value)}
+                onChange={(val) => setCustomerPhone(val)}
+                placeholder="300-1234567"
+                showHelperText={false}
               />
             </div>
 
@@ -491,11 +493,12 @@ export function SaleForm({
               <Label htmlFor="salesmanMobile" className="text-xs font-medium text-muted-foreground">
                 Salesman Mobile #
               </Label>
-              <Input
+              <PhoneNumberInput
                 id="salesmanMobile"
-                placeholder="e.g. 0321-7654321"
                 value={salesmanMobile}
-                onChange={(e) => setSalesmanMobile(e.target.value)}
+                onChange={(val) => setSalesmanMobile(val)}
+                placeholder="321-7654321"
+                showHelperText={false}
               />
             </div>
 
