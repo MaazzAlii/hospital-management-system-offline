@@ -33,6 +33,20 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       return new NextResponse('Lab Order not found', { status: 404 });
     }
 
+    // Fetch linked invoice and payments for billing details in the PDF
+    const invoice = await prisma.invoice.findFirst({
+      where: {
+        OR: [
+          { sourceType: 'Lab', sourceId: order.id },
+          { notes: { contains: order.orderNo } },
+        ],
+      },
+      include: {
+        items: true,
+        payments: true,
+      },
+    });
+
     // Fetch Reference Ranges for all tests in the order to display them in the PDF
     const testIds = order.items?.map((item: any) => item.testId).filter(Boolean) || [];
     if (testIds.length > 0) {
@@ -46,7 +60,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
           if (item) {
             const testRanges = ranges.filter((r: any) => r.testId === item.testId);
             let matchedRange = testRanges.find((r: any) => 
-              r.gender === order.patient?.gender || r.gender === 'All'
+              r.gender === (order.patient?.gender || (order as any).Patient?.gender) || r.gender === 'All'
             ) || testRanges[0];
             
             if (matchedRange) {
@@ -62,7 +76,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     const logoUrl = `${url.protocol}//${url.host}/logo.jpeg`;
 
     const pdfStream = await renderToStream(
-      <LabReportPDF order={order} settings={settings} logoUrl={logoUrl} />
+      <LabReportPDF order={order} invoice={invoice} settings={settings} logoUrl={logoUrl} />
     );
 
     const readableStream = new ReadableStream({
