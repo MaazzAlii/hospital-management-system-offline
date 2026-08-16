@@ -180,7 +180,16 @@ export async function markInvoicePaid(id: string, method: string) {
 export async function getClinicSettings() {
   let settings = await prisma.settings.findFirst();
   if (!settings) {
-    settings = await prisma.settings.create({ data: {} });
+    settings = await prisma.settings.create({
+      data: {
+        clinicName: "Life Care Clinic, Nawagai Buner",
+        address: "Nawagai, Buner, Khyber Pakhtunkhwa",
+        phone: "03439626941",
+        email: "shakeelbuneri933@gmail.com",
+        currency: "PKR",
+        taxRate: 0,
+      },
+    });
   }
   return settings;
 }

@@ -93,10 +93,10 @@ async function resetSeedDatabase() {
       console.log('[reset-seed-data] Creating default Settings record...');
       await tx.settings.create({
         data: {
-          clinicName: 'Life Care Hospital',
-          address: 'Nawagai, Buner, Khyber Pakhtunkhwa, Pakistan',
-          phone: '+92 300 1234567',
-          email: 'info@lifecarehospital.pk',
+          clinicName: 'Life Care Clinic, Nawagai Buner',
+          address: 'Nawagai, Buner, Khyber Pakhtunkhwa',
+          phone: '03439626941',
+          email: 'shakeelbuneri933@gmail.com',
           currency: 'PKR',
           taxRate: 0,
         },
@@ -106,10 +106,10 @@ async function resetSeedDatabase() {
       await tx.settings.update({
         where: { id: existingSettings.id },
         data: {
-          clinicName: 'Life Care Hospital',
-          address: 'Nawagai, Buner, Khyber Pakhtunkhwa, Pakistan',
-          phone: '+92 300 1234567',
-          email: 'info@lifecarehospital.pk',
+          clinicName: 'Life Care Clinic, Nawagai Buner',
+          address: 'Nawagai, Buner, Khyber Pakhtunkhwa',
+          phone: '03439626941',
+          email: 'shakeelbuneri933@gmail.com',
           currency: 'PKR',
           taxRate: 0,
         },

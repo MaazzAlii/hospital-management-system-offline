@@ -199,10 +199,10 @@ model Payment {
 
 model Settings {
   id        String   @id @default(cuid())
-  clinicName String  @default("Life Care Clinic")
-  address   String?
-  phone     String?
-  email     String?
+  clinicName String  @default("Life Care Clinic, Nawagai Buner")
+  address   String?  @default("Nawagai, Buner, Khyber Pakhtunkhwa")
+  phone     String?  @default("03439626941")
+  email     String?  @default("shakeelbuneri933@gmail.com")
   logoUrl   String?
   taxRate   Float    @default(0)
   currency  String   @default("PKR")
