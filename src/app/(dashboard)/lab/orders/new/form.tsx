@@ -82,7 +82,12 @@ export function LabOrderForm({ tests, patients }: { tests: any[], patients: any[
               <Label htmlFor="patient">Patient *</Label>
               <Select value={patientId} onValueChange={(val) => setPatientId(val || "")} required>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select Patient" />
+                  <SelectValue placeholder="Select Patient">
+                    {(() => {
+                      const p = patients.find((pat: any) => pat.id === patientId)
+                      return p ? `${p.name} (${p.mrn})` : undefined
+                    })()}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {patients.map((p: any) => (

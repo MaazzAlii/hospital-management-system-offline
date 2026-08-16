@@ -144,7 +144,9 @@ export function PurchaseForm({ suppliers, medicines }: { suppliers: any[], medic
               <Label htmlFor="supplier">Supplier</Label>
               <Select value={supplierId} onValueChange={v => setSupplierId(v || '')}>
                 <SelectTrigger id="supplier">
-                  <SelectValue placeholder="Select supplier..." />
+                  <SelectValue placeholder="Select supplier...">
+                    {suppliers.find((s: any) => s.id === supplierId)?.name}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {suppliers.map(s => (
@@ -189,7 +191,9 @@ export function PurchaseForm({ suppliers, medicines }: { suppliers: any[], medic
                         onValueChange={v => updateItem(item.id, 'medicineId', v)}
                       >
                         <SelectTrigger>
-                          <SelectValue placeholder="Select medicine..." />
+                          <SelectValue placeholder="Select medicine...">
+                            {medicines.find((m: any) => m.id === item.medicineId)?.name}
+                          </SelectValue>
                         </SelectTrigger>
                         <SelectContent>
                           {medicines.map(m => (

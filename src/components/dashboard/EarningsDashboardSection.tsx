@@ -117,7 +117,9 @@ export function EarningsDashboardSection({ initialData }: { initialData: Earning
                 onValueChange={(val) => setMonthParam(Number(val))}
               >
                 <SelectTrigger className="h-8 text-xs w-32">
-                  <SelectValue />
+                  <SelectValue>
+                    {MONTHS.find((m) => m.value === monthParam)?.label}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {MONTHS.map((m) => (

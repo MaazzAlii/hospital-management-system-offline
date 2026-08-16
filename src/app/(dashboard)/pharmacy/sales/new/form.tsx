@@ -380,7 +380,12 @@ export function SaleForm({
               </Label>
               <Select value={patientId} onValueChange={(val) => handlePatientSelect(val)}>
                 <SelectTrigger id="patientSelect">
-                  <SelectValue placeholder="Select patient / customer" />
+                  <SelectValue placeholder="Select patient / customer">
+                    {patientId === 'walk-in' ? 'Walk-in / Wholesale Customer' : (() => {
+                      const p = patients.find((pat) => pat.id === patientId)
+                      return p ? `${p.name || `${p.firstName || ''} ${p.lastName || ''}`.trim()} ${p.mrn ? `(${p.mrn})` : ''}` : undefined
+                    })()}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="walk-in">Walk-in / Wholesale Customer</SelectItem>
@@ -618,7 +623,9 @@ export function SaleForm({
                             onValueChange={(val) => handleMedicineChange(item.id, val || '')}
                           >
                             <SelectTrigger className="h-8 text-xs">
-                              <SelectValue placeholder="Select medicine..." />
+                              <SelectValue placeholder="Select medicine...">
+                                {selectedMed?.name}
+                              </SelectValue>
                             </SelectTrigger>
                             <SelectContent className="max-h-72">
                               {medicines.map((m) => (
@@ -644,7 +651,12 @@ export function SaleForm({
                                 onValueChange={(val) => handleBatchChange(item.id, val || '')}
                               >
                                 <SelectTrigger className="h-8 text-xs">
-                                  <SelectValue placeholder="Select Batch..." />
+                                  <SelectValue placeholder="Select Batch...">
+                                    {(() => {
+                                      const b = availableBatches.find((bat) => bat.id === item.batchId)
+                                      return b ? `${b.batchNo} (Exp: ${new Date(b.expiryDate).toLocaleDateString()})` : undefined
+                                    })()}
+                                  </SelectValue>
                                 </SelectTrigger>
                                 <SelectContent>
                                   {availableBatches.map((b) => {

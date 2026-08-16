@@ -122,7 +122,9 @@ export function LabTestForm({ initialCategories }: { initialCategories: any[] })
                     required
                   >
                     <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Select Category" />
+                      <SelectValue placeholder="Select Category">
+                        {categories.find((c: any) => c.id === formData.categoryId)?.name}
+                      </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
                       {categories.map((c: any) => (
