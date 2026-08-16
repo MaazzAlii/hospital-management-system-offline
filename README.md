@@ -153,6 +153,14 @@ A production-grade, offline-first Hospital Management System (HMS) designed and 
 ### 18. System Settings & Clinic Profile
 ![Settings & Clinic Profile](docs/screenshots/67-settings-clinic-profile.png)
 ![Administrator User Profile](docs/screenshots/68-settings-user-profile.png)
+![Verified Clinic Details](docs/screenshots/70-settings-clinic-details.png)
+
+### 19. Add Medicine with Optional Initial Stock & Batch Allocation
+![Add Medicine Initial Stock](docs/screenshots/69-add-medicine-initial-stock.png)
+![Active Inventory Stock](docs/screenshots/72-pharmacy-medicine-inventory-stock.png)
+
+### 20. Pharmacy Wholesale Sale with FEFO Batch Tracking
+![Pharmacy Sale Details](docs/screenshots/71-pharmacy-sale-batch-details.png)
 
 ---
 
