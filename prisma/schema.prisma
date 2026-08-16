@@ -394,6 +394,8 @@ model LabTest {
   category        LabCategory?     @relation(fields: [categoryId], references: [id])
   price           Float            @default(0)
   sampleType      String?
+  turnaroundHours Int?
+  isActive        Boolean          @default(true)
   description     String?
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
