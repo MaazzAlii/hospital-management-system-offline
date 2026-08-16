@@ -15,7 +15,7 @@ export default async function LabTestsPage({
   const tests = await getLabTests(query);
 
   const totalTests = tests.length;
-  const activeTests = tests.length;
+  const activeTests = tests.filter((t: any) => t.isActive).length;
 
   return (
     <div className="space-y-5">
@@ -76,6 +76,7 @@ export default async function LabTestsPage({
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Category</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Sample Type</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Price</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Status</th>
               </tr>
             </thead>
             <tbody>
@@ -90,11 +91,18 @@ export default async function LabTestsPage({
                       {test.sampleType || "—"}
                     </td>
                     <td className="px-4 py-3 text-sm font-medium">Rs. {Number(test.price || 0).toFixed(2)}</td>
+                    <td className="px-4 py-3 text-sm">
+                      <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                        test.isActive ? "bg-success/10 text-success" : "bg-muted text-muted-foreground"
+                      }`}>
+                        {test.isActive ? "Active" : "Inactive"}
+                      </span>
+                    </td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan={5} className="px-4 py-12 text-center text-sm text-muted-foreground">
+                  <td colSpan={6} className="px-4 py-12 text-center text-sm text-muted-foreground">
                     {query ? `No tests found matching "${query}".` : 'No tests registered yet.'}
                   </td>
                 </tr>

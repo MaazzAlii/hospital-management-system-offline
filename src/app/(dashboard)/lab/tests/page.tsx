@@ -85,7 +85,7 @@ export default async function LabTestsPage({
                   <tr key={test.id} className="border-b transition-colors hover:bg-muted/40">
                     <td className="px-4 py-3 text-sm font-medium text-foreground">{test.name}</td>
                     <td className="px-4 py-3 text-sm text-muted-foreground">{test.code || "—"}</td>
-                    <td className="px-4 py-3 text-sm text-muted-foreground">{test.LabCategory?.name || "—"}</td>
+                    <td className="px-4 py-3 text-sm text-muted-foreground">{test.category?.name || test.LabCategory?.name || "—"}</td>
                     <td className="px-4 py-3 text-sm text-muted-foreground flex items-center gap-2">
                       <TestTube className="h-4 w-4 text-muted-foreground" />
                       {test.sampleType || "—"}
