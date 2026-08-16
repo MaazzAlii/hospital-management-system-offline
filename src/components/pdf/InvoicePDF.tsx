@@ -286,12 +286,12 @@ export function InvoicePDF({
               )}
               <View style={styles.companyInfo}>
                 <Text style={styles.companyName}>
-                  {invoice.suppliedBy || settings?.clinicName || 'LIFE CARE PHARMACY & DISTRIBUTORS'}
+                  {settings?.clinicName || 'Life Care Clinic, Nawagai Buner'}
                 </Text>
-                <Text style={styles.companyTagline}>Wholesale Medicine Distributors & Health Care Solutions</Text>
+                <Text style={styles.companyTagline}>Health Care Solutions & Pharmacy</Text>
                 <Text style={styles.companyDetails}>
-                  {settings?.address || 'Main Road, Health Plaza, Sector G-9, Islamabad'} | Phone:{' '}
-                  {settings?.phone || '051-1234567'} | Email: {settings?.email || 'info@lifecare.com'}
+                  {settings?.address || 'Nawagai, Buner, Khyber Pakhtunkhwa'} | Phone:{' '}
+                  {settings?.phone || '03439626941'} | Email: {settings?.email || 'shakeelbuneri933@gmail.com'}
                 </Text>
               </View>
             </View>
