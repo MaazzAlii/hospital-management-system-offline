@@ -84,10 +84,52 @@ export async function createLabTest(data: {
       price: data.price,
       sampleType: data.sampleType || null,
       description: data.description || null,
+      turnaroundHours: data.turnaroundHours ?? null,
+      isActive: data.isActive ?? true,
     },
   });
 
   revalidatePath('/lab/tests');
   revalidatePath('/lab-tests');
+  revalidatePath('/lab/orders/new');
   return test;
 }
+
+export async function updateLabTest(
+  id: string,
+  data: {
+    name?: string;
+    categoryId?: string | null;
+    code?: string;
+    price?: number;
+    sampleType?: string | null;
+    description?: string | null;
+    turnaroundHours?: number | null;
+    isActive?: boolean;
+  }
+) {
+  const { role } = await getCurrentUserRole();
+  if (!hasAccess(role, 'lab', 'write')) {
+    throw new Error('Unauthorized');
+  }
+
+  const test = await prisma.labTest.update({
+    where: { id },
+    data: {
+      ...(data.name !== undefined && { name: data.name }),
+      ...(data.categoryId !== undefined && { categoryId: data.categoryId || null }),
+      ...(data.code !== undefined && { code: data.code }),
+      ...(data.price !== undefined && { price: data.price }),
+      ...(data.sampleType !== undefined && { sampleType: data.sampleType || null }),
+      ...(data.description !== undefined && { description: data.description || null }),
+      ...(data.turnaroundHours !== undefined && { turnaroundHours: data.turnaroundHours }),
+      ...(data.isActive !== undefined && { isActive: data.isActive }),
+    },
+  });
+
+  revalidatePath('/lab/tests');
+  revalidatePath('/lab-tests');
+  revalidatePath('/lab/orders/new');
+  return test;
+}
+
