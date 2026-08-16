@@ -56,6 +56,12 @@ export default function NewMedicineForm({
   const [reorderLevel, setReorderLevel] = useState("100"); // Default level
   const [barcode, setBarcode] = useState("");
 
+  // Optional Initial Stock & Batch States
+  const [enableInitialStock, setEnableInitialStock] = useState(false);
+  const [initialQuantity, setInitialQuantity] = useState("");
+  const [batchNo, setBatchNo] = useState("");
+  const [expiryDate, setExpiryDate] = useState("");
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -90,6 +96,12 @@ export default function NewMedicineForm({
     if (!unit.trim()) errs.unit = "Unit (e.g. Box, Strip, Tablet) is required";
     if (!reorderLevel || Number(reorderLevel) < 0) errs.reorderLevel = "Reorder level must be 0 or more";
 
+    if (enableInitialStock) {
+      if (!initialQuantity || Number(initialQuantity) <= 0) {
+        errs.initialQuantity = "Initial quantity must be greater than 0";
+      }
+    }
+
     setFieldErrors(errs);
     return Object.keys(errs).length === 0;
   };
@@ -101,6 +113,15 @@ export default function NewMedicineForm({
     setIsSubmitting(true);
     setErrorMsg(null);
 
+    const initialStockPayload =
+      enableInitialStock && Number(initialQuantity) > 0
+        ? {
+            quantity: Number(initialQuantity),
+            batchNo: batchNo.trim() || undefined,
+            expiryDate: expiryDate || undefined,
+          }
+        : undefined;
+
     const result = await createMedicine({
       name: name.trim(),
       categoryId,
@@ -110,6 +131,7 @@ export default function NewMedicineForm({
       unit: unit.trim(),
       reorderLevel: Number(reorderLevel),
       barcode: barcode.trim() || undefined,
+      initialStock: initialStockPayload,
     });
 
     setIsSubmitting(false);
@@ -139,7 +161,7 @@ export default function NewMedicineForm({
           <div>
             <h1 className="text-xl font-semibold tracking-tight">Add Medicine</h1>
             <p className="text-sm text-muted-foreground">
-              Register a new medicine to your pharmacy database.
+              Register a new medicine to your pharmacy database with optional initial batch stock.
             </p>
           </div>
         </div>
@@ -310,6 +332,61 @@ export default function NewMedicineForm({
               />
             </Field>
           </div>
+        </div>
+
+        {/* Optional Initial Stock & Batch Section */}
+        <div className="rounded-xl border bg-card p-6 shadow-sm space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-sm font-semibold text-foreground">Initial Stock & Batch (Optional)</h2>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Add an opening stock batch immediately with expiry date and batch number.
+              </p>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={enableInitialStock}
+                onChange={(e) => setEnableInitialStock(e.target.checked)}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-muted peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+            </label>
+          </div>
+
+          {enableInitialStock && (
+            <div className="grid gap-4 pt-3 sm:grid-cols-3 border-t">
+              <Field label="Initial Quantity" required error={fieldErrors.initialQuantity}>
+                <input
+                  type="number"
+                  min="1"
+                  value={initialQuantity}
+                  onChange={(e) => setInitialQuantity(e.target.value)}
+                  placeholder="e.g. 50"
+                  className={inputClass}
+                />
+              </Field>
+
+              <Field label="Batch Number" error={fieldErrors.batchNo}>
+                <input
+                  type="text"
+                  value={batchNo}
+                  onChange={(e) => setBatchNo(e.target.value)}
+                  placeholder="e.g. B-101 (Auto if blank)"
+                  className={inputClass}
+                />
+              </Field>
+
+              <Field label="Expiry Date" error={fieldErrors.expiryDate}>
+                <input
+                  type="date"
+                  value={expiryDate}
+                  onChange={(e) => setExpiryDate(e.target.value)}
+                  className={inputClass}
+                />
+              </Field>
+            </div>
+          )}
         </div>
 
         {/* Actions */}

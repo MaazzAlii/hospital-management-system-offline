@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { getCurrentUserRole, hasAccess } from "@/lib/auth-utils";
 import { getErrorMessage } from "@/lib/error-utils";
+import { generatePurchaseNo } from "@/lib/id-generator";
 
 export async function getMedicineCategories() {
   const { role } = await getCurrentUserRole();
@@ -43,6 +44,11 @@ export async function createMedicine(data: {
   unit: string;
   reorderLevel: number;
   barcode?: string;
+  initialStock?: {
+    quantity: number;
+    batchNo?: string;
+    expiryDate?: string;
+  };
 }) {
   try {
     const { role } = await getCurrentUserRole();
@@ -50,20 +56,80 @@ export async function createMedicine(data: {
       throw new Error("Unauthorized to create medicines");
     }
 
-    const medicine = await prisma.medicine.create({
-      data: {
-        name: data.name,
-        categoryId: data.categoryId || null,
-        manufacturer: data.manufacturer || null,
-        unitPrice: Number(data.inPrice),
-        sellingPrice: Number(data.outPrice),
-        unit: data.unit,
-        reorderLevel: Number(data.reorderLevel),
-      },
+    const result = await prisma.$transaction(async (tx) => {
+      const medicine = await tx.medicine.create({
+        data: {
+          name: data.name,
+          categoryId: data.categoryId || null,
+          manufacturer: data.manufacturer || null,
+          unitPrice: Number(data.inPrice),
+          sellingPrice: Number(data.outPrice),
+          unit: data.unit,
+          reorderLevel: Number(data.reorderLevel),
+        },
+      });
+
+      if (data.initialStock && Number(data.initialStock.quantity) > 0) {
+        const qty = Number(data.initialStock.quantity);
+        const batchCode = data.initialStock.batchNo?.trim() || `B-${Date.now().toString().slice(-6)}`;
+        const defaultExp = new Date();
+        defaultExp.setFullYear(defaultExp.getFullYear() + 2);
+        const expDate = data.initialStock.expiryDate ? new Date(data.initialStock.expiryDate) : defaultExp;
+        const inPrice = Number(data.inPrice) || 0;
+
+        const purchaseNo = await generatePurchaseNo(tx);
+        const purchase = await tx.purchase.create({
+          data: {
+            purchaseNo,
+            totalAmount: inPrice * qty,
+            status: "completed",
+            notes: `Initial stock for ${medicine.name}`,
+          },
+        });
+
+        const purchaseItem = await tx.purchaseItem.create({
+          data: {
+            purchaseId: purchase.id,
+            medicineId: medicine.id,
+            quantity: qty,
+            unitPrice: inPrice,
+            totalPrice: inPrice * qty,
+            batchNo: batchCode,
+            expiryDate: expDate,
+          },
+        });
+
+        await tx.batch.create({
+          data: {
+            medicineId: medicine.id,
+            purchaseItemId: purchaseItem.id,
+            batchNo: batchCode,
+            expiryDate: expDate,
+            quantityReceived: qty,
+            quantityRemaining: qty,
+          },
+        });
+
+        await tx.stockMovement.create({
+          data: {
+            medicineId: medicine.id,
+            purchaseItemId: purchaseItem.id,
+            type: "purchase",
+            quantity: qty,
+            referenceType: "Purchase",
+            referenceId: purchase.id,
+            notes: `Initial stock batch: ${batchCode}`,
+          },
+        });
+      }
+
+      return medicine;
     });
-    
+
     revalidatePath("/pharmacy/medicines");
-    return { success: true, medicine };
+    revalidatePath("/pharmacy/inventory");
+    revalidatePath("/pharmacy/purchases");
+    return { success: true, medicine: result };
   } catch (error: unknown) {
     console.error("Failed to create medicine:", error);
     return { success: false, error: getErrorMessage(error, "Failed to create medicine") };
