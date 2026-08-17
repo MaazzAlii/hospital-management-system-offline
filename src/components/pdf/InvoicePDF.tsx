@@ -290,8 +290,10 @@ export function InvoicePDF({
                 </Text>
                 <Text style={styles.companyTagline}>Health Care Solutions & Pharmacy</Text>
                 <Text style={styles.companyDetails}>
-                  {settings?.address || 'Nawagai, Buner, Khyber Pakhtunkhwa'} | Phone:{' '}
-                  {settings?.phone || '03439626941'} | Email: {settings?.email || 'shakeelbuneri933@gmail.com'}
+                  {settings?.address || 'Nawagai, Buner, Khyber Pakhtunkhwa'}
+                </Text>
+                <Text style={styles.companyDetails}>
+                  Phone: {settings?.phone || '03439626941'}  |  Email: {settings?.email || 'shakeelbuneri933@gmail.com'}
                 </Text>
               </View>
             </View>

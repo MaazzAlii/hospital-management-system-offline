@@ -264,8 +264,10 @@ export function LabReportPDF({
               </Text>
               <Text style={styles.clinicTagline}>Clinical Diagnostic Laboratory Services</Text>
               <Text style={styles.clinicDetails}>
-                {settings?.address || 'Nawagai, Buner, Khyber Pakhtunkhwa'} | Phone:{' '}
-                {settings?.phone || '03439626941'} | Email: {settings?.email || 'shakeelbuneri933@gmail.com'}
+                {settings?.address || 'Nawagai, Buner, Khyber Pakhtunkhwa'}
+              </Text>
+              <Text style={styles.clinicDetails}>
+                Phone: {settings?.phone || '03439626941'}  |  Email: {settings?.email || 'shakeelbuneri933@gmail.com'}
               </Text>
             </View>
           </View>
