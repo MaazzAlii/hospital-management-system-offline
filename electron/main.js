@@ -155,6 +155,22 @@ function ensureDatabaseExists() {
           stdio: 'inherit',
         });
       }
+    } else {
+      try {
+        const Database = require('better-sqlite3');
+        const db = new Database(dbPath);
+        const columns = db.prepare("PRAGMA table_info(LabTest)").all();
+        const colNames = new Set(columns.map(c => c.name));
+        if (!colNames.has('turnaroundHours')) {
+          db.prepare("ALTER TABLE LabTest ADD COLUMN turnaroundHours INTEGER").run();
+        }
+        if (!colNames.has('isActive')) {
+          db.prepare("ALTER TABLE LabTest ADD COLUMN isActive BOOLEAN NOT NULL DEFAULT 1").run();
+        }
+        db.close();
+      } catch (migrateErr) {
+        console.warn('[Electron] DB schema migration check warning:', migrateErr);
+      }
     }
   } catch (err) {
     console.error('[Electron] Database initialization error:', err);
