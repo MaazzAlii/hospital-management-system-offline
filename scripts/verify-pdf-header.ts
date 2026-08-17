@@ -106,7 +106,7 @@ async function main() {
 
   const invoicePdfPath = path.join(artifactDir, 'test-invoice.pdf');
   await renderToFile(
-    React.createElement(InvoicePDF, { invoice: testInvoice, settings: clinicSettings }),
+    React.createElement(InvoicePDF, { invoice: testInvoice, settings: clinicSettings }) as any,
     invoicePdfPath
   );
   console.log('✅ Generated test-invoice.pdf at:', invoicePdfPath);
@@ -145,7 +145,7 @@ async function main() {
 
   const labPdfPath = path.join(artifactDir, 'test-lab-report.pdf');
   await renderToFile(
-    React.createElement(LabReportPDF, { order: testLabOrder, settings: clinicSettings }),
+    React.createElement(LabReportPDF, { order: testLabOrder, settings: clinicSettings }) as any,
     labPdfPath
   );
   console.log('✅ Generated test-lab-report.pdf at:', labPdfPath);
