@@ -69,7 +69,8 @@ A production-grade, offline-first Hospital Management System (HMS) designed and 
 ### 6. 💳 Billing, Invoices & PDF Printing
 - Integrated point-of-sale and clinic billing module.
 - Atomically generated invoices linked to OPD consultations, lab tests, and pharmacy sales.
-- Professional, high-resolution PDF invoice generation formatted to wholesale distributor standards.
+- Professional, high-resolution PDF invoice and lab report generation formatted to wholesale distributor and clinical diagnostic laboratory standards.
+- Clean header contact line layout separating Address and Contact details across two structured lines, preventing email mid-word hyphen wrapping (`shakeelbuneri933@gmail.com`).
 
 ### 7. 🔒 Role-Based Access Control (RBAC) & Audit Logging
 - Role definitions: `Admin`, `Doctor`, `Receptionist`, `Pharmacist`, `Lab Technician`, and `Cashier`.
