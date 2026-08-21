@@ -14,3 +14,32 @@ export function computeAge(dob: string): number {
   return age;
 }
 
+/**
+ * Safely formats any date string, Date object, or timestamp to a localized date string.
+ * Returns a fallback ("—") if the date is null, undefined, or invalid.
+ */
+export function formatDisplayDate(
+  date: string | number | Date | null | undefined,
+  options?: Intl.DateTimeFormatOptions,
+  fallback = "—"
+): string {
+  if (!date) return fallback;
+  const d = new Date(date);
+  if (isNaN(d.getTime())) return fallback;
+  return d.toLocaleDateString("en-PK", options);
+}
+
+/**
+ * Safely formats any date string, Date object, or timestamp to a localized date & time string.
+ * Returns a fallback ("—") if the date is null, undefined, or invalid.
+ */
+export function formatDisplayDateTime(
+  date: string | number | Date | null | undefined,
+  options?: Intl.DateTimeFormatOptions,
+  fallback = "—"
+): string {
+  if (!date) return fallback;
+  const d = new Date(date);
+  if (isNaN(d.getTime())) return fallback;
+  return d.toLocaleString("en-PK", options);
+}

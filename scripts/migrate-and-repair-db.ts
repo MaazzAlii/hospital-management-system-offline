@@ -30,6 +30,10 @@ function migrateAndRepairDb(dbPath: string) {
   const updateResult = db.prepare("UPDATE LabTest SET isActive = 1 WHERE isActive IS NULL OR isActive = 0").run();
   console.log(`Updated ${updateResult.changes} lab tests to isActive = 1 (true).`);
 
+  // Update all medicines where reorderLevel is 100 to 4
+  const medFix = db.prepare("UPDATE Medicine SET reorderLevel = 4 WHERE reorderLevel = 100").run();
+  console.log(`Updated ${medFix.changes} medicines from reorderLevel=100 to 4.`);
+
   const allTests = db.prepare("SELECT id, code, name, price, sampleType, turnaroundHours, isActive FROM LabTest").all();
   console.log(`Total lab tests in DB: ${allTests.length}`);
   console.log(`Sample lab tests:`, allTests.slice(0, 5));

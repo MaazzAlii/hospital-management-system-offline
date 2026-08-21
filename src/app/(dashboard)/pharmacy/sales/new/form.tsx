@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Trash2, Plus, ArrowLeft, AlertCircle, CheckCircle, Clock, FileText, ShoppingCart } from 'lucide-react'
+import { Trash2, Plus, ArrowLeft, AlertCircle, CheckCircle, Clock, FileText, ShoppingCart, ChevronDown, ChevronUp, Building2 } from 'lucide-react'
 import { createSale } from '@/app/actions/sale'
 import { PhoneNumberInput } from '@/components/ui/phone-number-input'
 import Link from 'next/link'
@@ -78,6 +78,7 @@ export function SaleForm({
   const [suppliedBy, setSuppliedBy] = useState(settings?.clinicName || 'Life Care Pharmacy')
   const [territory, setTerritory] = useState('')
   const [remarks, setRemarks] = useState('')
+  const [showWholesaleFields, setShowWholesaleFields] = useState(false)
 
   // Line items state
   const [items, setItems] = useState<InvoiceLineItem[]>([])
@@ -354,10 +355,11 @@ export function SaleForm({
         <CardHeader className="bg-muted/30 pb-4">
           <CardTitle className="text-lg font-semibold flex items-center gap-2">
             <FileText className="h-5 w-5 text-primary" />
-            Distributor Invoice Header & Customer Details
+            Invoice Header & Customer Details
           </CardTitle>
         </CardHeader>
         <CardContent className="pt-6 space-y-4">
+          {/* Primary Walk-in / Customer Fields */}
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {/* Sale / Invoice Date */}
             <div className="space-y-1.5">
@@ -401,19 +403,6 @@ export function SaleForm({
               </Select>
             </div>
 
-            {/* Account Code */}
-            <div className="space-y-1.5">
-              <Label htmlFor="accountCode" className="text-xs font-medium text-muted-foreground">
-                Account Code
-              </Label>
-              <Input
-                id="accountCode"
-                placeholder="e.g. ACC-2004"
-                value={accountCode}
-                onChange={(e) => setAccountCode(e.target.value)}
-              />
-            </div>
-
             {/* Customer Name */}
             <div className="space-y-1.5">
               <Label htmlFor="customerName" className="text-xs font-medium text-muted-foreground">
@@ -440,97 +429,6 @@ export function SaleForm({
                 showHelperText={false}
               />
             </div>
-
-            {/* License No */}
-            <div className="space-y-1.5">
-              <Label htmlFor="licenseNo" className="text-xs font-medium text-muted-foreground">
-                Drug License No.
-              </Label>
-              <Input
-                id="licenseNo"
-                placeholder="e.g. 05-A/2024"
-                value={licenseNo}
-                onChange={(e) => setLicenseNo(e.target.value)}
-              />
-            </div>
-
-            {/* NTN No */}
-            <div className="space-y-1.5">
-              <Label htmlFor="ntn" className="text-xs font-medium text-muted-foreground">
-                NTN No.
-              </Label>
-              <Input
-                id="ntn"
-                placeholder="e.g. 1234567-8"
-                value={ntn}
-                onChange={(e) => setNtn(e.target.value)}
-              />
-            </div>
-
-            {/* Summary / PRS No */}
-            <div className="space-y-1.5">
-              <Label htmlFor="summaryPrsNo" className="text-xs font-medium text-muted-foreground">
-                Summary / PRS No.
-              </Label>
-              <Input
-                id="summaryPrsNo"
-                placeholder="e.g. PRS-0941"
-                value={summaryPrsNo}
-                onChange={(e) => setSummaryPrsNo(e.target.value)}
-              />
-            </div>
-
-            {/* Booked By */}
-            <div className="space-y-1.5">
-              <Label htmlFor="bookedBy" className="text-xs font-medium text-muted-foreground">
-                Booked By (Order Booker)
-              </Label>
-              <Input
-                id="bookedBy"
-                placeholder="e.g. Tariq Mehmood"
-                value={bookedBy}
-                onChange={(e) => setBookedBy(e.target.value)}
-              />
-            </div>
-
-            {/* Salesman Mobile */}
-            <div className="space-y-1.5">
-              <Label htmlFor="salesmanMobile" className="text-xs font-medium text-muted-foreground">
-                Salesman Mobile #
-              </Label>
-              <PhoneNumberInput
-                id="salesmanMobile"
-                value={salesmanMobile}
-                onChange={(val) => setSalesmanMobile(val)}
-                placeholder="321-7654321"
-                showHelperText={false}
-              />
-            </div>
-
-            {/* Supplied By */}
-            <div className="space-y-1.5">
-              <Label htmlFor="suppliedBy" className="text-xs font-medium text-muted-foreground">
-                Supplied By
-              </Label>
-              <Input
-                id="suppliedBy"
-                value={suppliedBy}
-                onChange={(e) => setSuppliedBy(e.target.value)}
-              />
-            </div>
-
-            {/* Territory */}
-            <div className="space-y-1.5">
-              <Label htmlFor="territory" className="text-xs font-medium text-muted-foreground">
-                Territory / Area
-              </Label>
-              <Input
-                id="territory"
-                placeholder="e.g. Rawalpindi Central"
-                value={territory}
-                onChange={(e) => setTerritory(e.target.value)}
-              />
-            </div>
           </div>
 
           {/* Customer Address */}
@@ -545,6 +443,158 @@ export function SaleForm({
               onChange={(e) => setCustomerAddress(e.target.value)}
             />
           </div>
+
+          {/* Collapsible Wholesale / Institutional Section */}
+          {(() => {
+            const hasWholesaleData = Boolean(
+              accountCode ||
+              licenseNo ||
+              ntn ||
+              summaryPrsNo ||
+              bookedBy ||
+              salesmanMobile ||
+              territory ||
+              (suppliedBy && suppliedBy !== (settings?.clinicName || 'Life Care Pharmacy'))
+            );
+            const isWholesaleOpen = showWholesaleFields || hasWholesaleData;
+
+            return (
+              <div className="pt-2 border-t">
+                <button
+                  type="button"
+                  onClick={() => setShowWholesaleFields((prev) => !prev)}
+                  className="flex items-center gap-2 text-xs font-medium text-primary hover:text-primary/80 transition-colors focus:outline-none py-1"
+                >
+                  <Building2 className="h-4 w-4" />
+                  <span>
+                    {isWholesaleOpen
+                      ? 'Hide wholesale / distributor details'
+                      : 'Add wholesale / distributor details (optional)'}
+                  </span>
+                  {isWholesaleOpen ? (
+                    <ChevronUp className="h-3.5 w-3.5" />
+                  ) : (
+                    <ChevronDown className="h-3.5 w-3.5" />
+                  )}
+                  {hasWholesaleData && !showWholesaleFields && (
+                    <span className="ml-2 text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded font-semibold">
+                      Details Added
+                    </span>
+                  )}
+                </button>
+
+                {isWholesaleOpen && (
+                  <div className="mt-3 p-4 bg-muted/20 border border-border/60 rounded-lg space-y-4">
+                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                      {/* Account Code */}
+                      <div className="space-y-1.5">
+                        <Label htmlFor="accountCode" className="text-xs font-medium text-muted-foreground">
+                          Account Code
+                        </Label>
+                        <Input
+                          id="accountCode"
+                          placeholder="e.g. ACC-2004"
+                          value={accountCode}
+                          onChange={(e) => setAccountCode(e.target.value)}
+                        />
+                      </div>
+
+                      {/* License No */}
+                      <div className="space-y-1.5">
+                        <Label htmlFor="licenseNo" className="text-xs font-medium text-muted-foreground">
+                          Drug License No.
+                        </Label>
+                        <Input
+                          id="licenseNo"
+                          placeholder="e.g. 05-A/2024"
+                          value={licenseNo}
+                          onChange={(e) => setLicenseNo(e.target.value)}
+                        />
+                      </div>
+
+                      {/* NTN No */}
+                      <div className="space-y-1.5">
+                        <Label htmlFor="ntn" className="text-xs font-medium text-muted-foreground">
+                          NTN No.
+                        </Label>
+                        <Input
+                          id="ntn"
+                          placeholder="e.g. 1234567-8"
+                          value={ntn}
+                          onChange={(e) => setNtn(e.target.value)}
+                        />
+                      </div>
+
+                      {/* Summary / PRS No */}
+                      <div className="space-y-1.5">
+                        <Label htmlFor="summaryPrsNo" className="text-xs font-medium text-muted-foreground">
+                          Summary / PRS No.
+                        </Label>
+                        <Input
+                          id="summaryPrsNo"
+                          placeholder="e.g. PRS-0941"
+                          value={summaryPrsNo}
+                          onChange={(e) => setSummaryPrsNo(e.target.value)}
+                        />
+                      </div>
+
+                      {/* Booked By */}
+                      <div className="space-y-1.5">
+                        <Label htmlFor="bookedBy" className="text-xs font-medium text-muted-foreground">
+                          Booked By (Order Booker)
+                        </Label>
+                        <Input
+                          id="bookedBy"
+                          placeholder="e.g. Tariq Mehmood"
+                          value={bookedBy}
+                          onChange={(e) => setBookedBy(e.target.value)}
+                        />
+                      </div>
+
+                      {/* Salesman Mobile */}
+                      <div className="space-y-1.5">
+                        <Label htmlFor="salesmanMobile" className="text-xs font-medium text-muted-foreground">
+                          Salesman Mobile #
+                        </Label>
+                        <PhoneNumberInput
+                          id="salesmanMobile"
+                          value={salesmanMobile}
+                          onChange={(val) => setSalesmanMobile(val)}
+                          placeholder="321-7654321"
+                          showHelperText={false}
+                        />
+                      </div>
+
+                      {/* Supplied By */}
+                      <div className="space-y-1.5">
+                        <Label htmlFor="suppliedBy" className="text-xs font-medium text-muted-foreground">
+                          Supplied By
+                        </Label>
+                        <Input
+                          id="suppliedBy"
+                          value={suppliedBy}
+                          onChange={(e) => setSuppliedBy(e.target.value)}
+                        />
+                      </div>
+
+                      {/* Territory */}
+                      <div className="space-y-1.5">
+                        <Label htmlFor="territory" className="text-xs font-medium text-muted-foreground">
+                          Territory / Area
+                        </Label>
+                        <Input
+                          id="territory"
+                          placeholder="e.g. Rawalpindi Central"
+                          value={territory}
+                          onChange={(e) => setTerritory(e.target.value)}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
         </CardContent>
       </Card>
 

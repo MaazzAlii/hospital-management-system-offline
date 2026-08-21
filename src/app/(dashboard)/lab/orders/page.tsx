@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Plus, Beaker } from "lucide-react";
 import { getLabOrders } from "@/app/actions/lab-order";
 import { Button } from "@/components/ui/button";
+import { formatDisplayDate } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -82,8 +83,8 @@ export default async function LabOrdersPage({
                 orders.map((order: any) => (
                   <tr key={order.id} className="border-b transition-colors hover:bg-muted/40">
                     <td className="px-4 py-3 text-sm font-medium text-foreground">{order.orderNo}</td>
-                    <td className="px-4 py-3 text-sm text-muted-foreground">{new Date(order.orderedAt).toLocaleDateString()}</td>
-                    <td className="px-4 py-3 text-sm text-muted-foreground font-medium">{order.Patient?.name}</td>
+                    <td className="px-4 py-3 text-sm text-muted-foreground">{formatDisplayDate(order.createdAt)}</td>
+                    <td className="px-4 py-3 text-sm text-muted-foreground font-medium">{order.patient?.name || order.Patient?.name || "Walk-in Patient"}</td>
                     <td className="px-4 py-3 text-sm">
                       <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
                         order.status === 'completed' ? "bg-success/10 text-success" : 

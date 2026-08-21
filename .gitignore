@@ -20,6 +20,8 @@
 # production & desktop builds
 /build/*
 !/build/installer.nsh
+!/build/icon.ico
+!/build/icon.png
 /dist
 
 # misc

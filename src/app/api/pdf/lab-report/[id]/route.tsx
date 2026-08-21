@@ -6,6 +6,7 @@ import { getClinicSettings } from '@/app/actions/billing';
 import { prisma } from '@/lib/prisma';
 import { getCurrentUserRole } from '@/lib/auth-utils';
 import { hasAccess } from '@/lib/permissions';
+import { getLogoBase64, logPdfError } from '@/lib/pdf-utils';
 import React from 'react';
 
 export const dynamic = 'force-dynamic';
@@ -72,18 +73,20 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       }
     }
 
-    const url = new URL(request.url);
-    const logoUrl = `${url.protocol}//${url.host}/logo.jpeg`;
+    const logoBase64 = getLogoBase64();
 
     const pdfStream = await renderToStream(
-      <LabReportPDF order={order} invoice={invoice} settings={settings} logoUrl={logoUrl} />
+      <LabReportPDF order={order} invoice={invoice} settings={settings} logoUrl={logoBase64} />
     );
 
     const readableStream = new ReadableStream({
       start(controller) {
         pdfStream.on('data', (chunk) => controller.enqueue(chunk));
         pdfStream.on('end', () => controller.close());
-        pdfStream.on('error', (err) => controller.error(err));
+        pdfStream.on('error', (err) => {
+          logPdfError(`Lab Report Stream [${order.orderNo}]`, err);
+          controller.error(err);
+        });
       }
     });
 
@@ -93,8 +96,9 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         'Content-Disposition': `attachment; filename="LabReport-${order.orderNo}.pdf"`,
       },
     });
-  } catch (error) {
-    console.error('Error generating Lab Report PDF:', error);
-    return new NextResponse('Internal Server Error generating PDF', { status: 500 });
+  } catch (error: any) {
+    logPdfError('Lab Report Route', error);
+    return new NextResponse(`Internal Server Error generating Lab Report PDF: ${error?.message || error}`, { status: 500 });
   }
 }
+

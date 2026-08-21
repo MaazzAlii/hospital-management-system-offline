@@ -5,6 +5,7 @@ import { ArrowLeft, FileText } from 'lucide-react'
 import Link from 'next/link'
 import { ResultFormClient } from './result-form'
 import { getCurrentUserRole, hasAccess } from '@/lib/auth-utils'
+import { PdfActionButton } from '@/components/common/PdfActionButton'
 
 export const dynamic = 'force-dynamic'
 
@@ -33,16 +34,17 @@ export default async function LabOrderDetailPage({ params }: { params: Promise<{
           {order.status.toUpperCase()}
         </Badge>
         {hasVerifiedResults && (
-          <a 
-            href={`/api/pdf/lab-report/${order.id}`} 
-            download 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 h-7 rounded-[min(var(--radius-md),12px)] px-2.5 text-[0.8rem] bg-primary text-primary-foreground hover:bg-primary/80"
+          <PdfActionButton
+            url={`/api/pdf/lab-report/${order.id}`}
+            filename={`LabReport-${order.orderNo || order.id}.pdf`}
+            mode="download"
+            variant="default"
+            size="sm"
+            className="gap-2 h-7 rounded-[min(var(--radius-md),12px)] px-2.5 text-[0.8rem]"
           >
             <FileText className="h-4 w-4" />
             Download PDF
-          </a>
+          </PdfActionButton>
         )}
       </div>
       

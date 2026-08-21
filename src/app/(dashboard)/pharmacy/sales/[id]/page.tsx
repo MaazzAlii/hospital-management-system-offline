@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { PdfActionButton } from "@/components/common/PdfActionButton";
 
 export const dynamic = "force-dynamic";
 
@@ -73,12 +74,16 @@ export default async function SaleViewPage({
         </div>
 
         <div className="flex items-center gap-2">
-          <Link href={`/api/pdf/invoice/${sale.id}`} target="_blank">
-            <Button variant="outline" className="gap-2">
-              <Printer className="h-4 w-4 text-primary" />
-              Print / PDF Invoice
-            </Button>
-          </Link>
+          <PdfActionButton
+            url={`/api/pdf/invoice/${sale.id}`}
+            filename={`Invoice-${sale.saleNo || sale.id}.pdf`}
+            mode="download"
+            variant="outline"
+            className="gap-2"
+          >
+            <Printer className="h-4 w-4 text-primary" />
+            Print / PDF Invoice
+          </PdfActionButton>
           <Link href="/pharmacy/returns/new">
             <Button variant="outline" className="gap-2">
               <RotateCcw className="h-4 w-4 text-amber-600" />

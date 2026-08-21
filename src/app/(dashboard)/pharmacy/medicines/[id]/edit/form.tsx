@@ -55,7 +55,7 @@ export default function EditMedicineForm({
   const [inPrice, setInPrice] = useState(medicine.unitPrice ? String(medicine.unitPrice) : "");
   const [outPrice, setOutPrice] = useState(medicine.sellingPrice ? String(medicine.sellingPrice) : "");
   const [unit, setUnit] = useState(medicine.unit || "Tablet");
-  const [reorderLevel, setReorderLevel] = useState(medicine.reorderLevel ? String(medicine.reorderLevel) : "10");
+  const [reorderLevel, setReorderLevel] = useState(medicine.reorderLevel !== undefined && medicine.reorderLevel !== null ? String(medicine.reorderLevel) : "4");
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);

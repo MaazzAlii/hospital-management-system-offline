@@ -1,9 +1,10 @@
 import { getPurchaseById } from "@/app/actions/purchase";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Edit, Calendar, Package, DollarSign, UserCheck } from "lucide-react";
+import { ArrowLeft, Edit, Calendar, Package, DollarSign, UserCheck, Printer } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { PdfActionButton } from "@/components/common/PdfActionButton";
 
 export const dynamic = "force-dynamic";
 
@@ -21,7 +22,7 @@ export default async function PurchaseViewPage({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <Link href="/pharmacy/purchases">
             <Button variant="outline" size="icon">
@@ -35,12 +36,24 @@ export default async function PurchaseViewPage({
             </p>
           </div>
         </div>
-        <Link href={`/pharmacy/purchases/${purchase.id}/edit`}>
-          <Button className="gap-2">
-            <Edit className="h-4 w-4" />
-            Edit Purchase
-          </Button>
-        </Link>
+        <div className="flex items-center gap-2">
+          <PdfActionButton
+            url={`/api/pdf/purchase/${purchase.id}`}
+            filename={`Purchase-${purchase.purchaseNo || purchase.id}.pdf`}
+            mode="download"
+            variant="outline"
+            className="gap-2"
+          >
+            <Printer className="h-4 w-4 text-primary" />
+            Print / PDF Invoice
+          </PdfActionButton>
+          <Link href={`/pharmacy/purchases/${purchase.id}/edit`}>
+            <Button className="gap-2">
+              <Edit className="h-4 w-4" />
+              Edit Purchase
+            </Button>
+          </Link>
+        </div>
       </div>
 
       <div className="grid gap-6 md:grid-cols-3">

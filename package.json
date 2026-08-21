@@ -12,13 +12,16 @@
     "lint": "eslint",
     "clean:dev-cache": "node scripts/clean-dev-cache.js",
     "db:reset-seed": "npx tsx scripts/reset-seed-data.ts",
-    "electron:dev": "electron .",
-    "electron:build": "node scripts/clean-dev-cache.js && next build && node scripts/copy-prisma-engine.js && node scripts/download-vc-redist.js && electron-builder --win",
+    "icons": "node scripts/generate-icons.js",
+    "electron:dev": "node scripts/generate-icons.js && electron .",
+    "electron:build": "node scripts/generate-icons.js && node scripts/clean-dev-cache.js && next build && node scripts/copy-prisma-engine.js && node scripts/download-vc-redist.js && electron-builder --win",
+    "electron:unpack": "node scripts/generate-icons.js && node scripts/clean-dev-cache.js && next build && node scripts/copy-prisma-engine.js && node scripts/download-vc-redist.js && electron-builder --win --dir",
     "postinstall": "electron-rebuild -f -w better-sqlite3"
   },
   "build": {
     "appId": "com.lifecare.hms",
     "productName": "Life Care HMS",
+    "icon": "build/icon.ico",
     "asar": false,
     "npmRebuild": false,
     "buildDependenciesFromSource": false,
@@ -27,6 +30,8 @@
     },
     "files": [
       "electron/**/*",
+      "build/icon.ico",
+      "build/icon.png",
       ".next/**/*",
       "!.next/dev/**/*",
       "!.next/cache/**/*",
@@ -49,7 +54,8 @@
       }
     ],
     "win": {
-      "target": "nsis"
+      "target": "nsis",
+      "icon": "build/icon.ico"
     },
     "nsis": {
       "oneClick": false,
@@ -58,6 +64,8 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "Life Care HMS",
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
       "include": "build/installer.nsh"
     }
   },

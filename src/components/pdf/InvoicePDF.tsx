@@ -293,7 +293,10 @@ export function InvoicePDF({
                   {settings?.address || 'Nawagai, Buner, Khyber Pakhtunkhwa'}
                 </Text>
                 <Text style={styles.companyDetails}>
-                  Phone: {settings?.phone || '03439626941'}  |  Email: {settings?.email || 'shakeelbuneri933@gmail.com'}
+                  Phone: {settings?.phone || '0343-9626941'}
+                </Text>
+                <Text style={styles.companyDetails}>
+                  Email: {settings?.email || 'shakeelbuneri933@gmail.com'}
                 </Text>
               </View>
             </View>

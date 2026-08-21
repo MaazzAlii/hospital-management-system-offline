@@ -53,7 +53,7 @@ export default function NewMedicineForm({
   const [inPrice, setInPrice] = useState("");
   const [outPrice, setOutPrice] = useState("");
   const [unit, setUnit] = useState("Tablet"); // Default unit
-  const [reorderLevel, setReorderLevel] = useState("100"); // Default level
+  const [reorderLevel, setReorderLevel] = useState("4"); // Default level
   const [barcode, setBarcode] = useState("");
 
   // Optional Initial Stock & Batch States

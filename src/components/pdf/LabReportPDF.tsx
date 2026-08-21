@@ -267,7 +267,10 @@ export function LabReportPDF({
                 {settings?.address || 'Nawagai, Buner, Khyber Pakhtunkhwa'}
               </Text>
               <Text style={styles.clinicDetails}>
-                Phone: {settings?.phone || '03439626941'}  |  Email: {settings?.email || 'shakeelbuneri933@gmail.com'}
+                Phone: {settings?.phone || '0343-9626941'}
+              </Text>
+              <Text style={styles.clinicDetails}>
+                Email: {settings?.email || 'shakeelbuneri933@gmail.com'}
               </Text>
             </View>
           </View>
@@ -286,7 +289,7 @@ export function LabReportPDF({
             )}
             <View style={styles.metaRow}>
               <Text style={styles.metaLabel}>Date:</Text>
-              <Text style={styles.metaValue}>{new Date(order.orderedAt || order.createdAt).toLocaleDateString()}</Text>
+              <Text style={styles.metaValue}>{new Date(order.createdAt || order.orderedAt || new Date()).toLocaleDateString()}</Text>
             </View>
             <View style={styles.metaRow}>
               <Text style={styles.metaLabel}>Payment Status:</Text>

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Plus } from "lucide-react";
 import { getLabOrders } from "@/app/actions/lab-order";
 import { Button } from "@/components/ui/button";
+import { formatDisplayDate } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -73,7 +74,7 @@ export default async function LabOrdersPage({
                     <td className="px-4 py-3 text-sm text-muted-foreground">{order.patient?.name || "Walk-in"}</td>
                     <td className="px-4 py-3 text-sm text-muted-foreground">{order.doctor?.user?.name || "—"}</td>
                     <td className="px-4 py-3 text-sm text-muted-foreground">
-                      {new Date(order.createdAt).toLocaleDateString()}
+                      {formatDisplayDate(order.createdAt)}
                     </td>
                     <td className="px-4 py-3 text-sm font-medium">Rs. {Number(order.totalAmount || 0).toFixed(2)}</td>
                     <td className="px-4 py-3 text-sm">

@@ -1,14 +1,13 @@
 import { NextResponse } from 'next/server';
 import { renderToStream } from '@react-pdf/renderer';
-import { InvoicePDF } from '@/components/pdf/InvoicePDF';
-import { getInvoiceById, getClinicSettings } from '@/app/actions/billing';
-import { getSaleById } from '@/app/actions/sale';
+import { PurchaseInvoicePDF } from '@/components/pdf/PurchaseInvoicePDF';
+import { getPurchaseById } from '@/app/actions/purchase';
+import { getClinicSettings } from '@/app/actions/billing';
 import { getCurrentUserRole } from '@/lib/auth-utils';
 import { hasAccess } from '@/lib/permissions';
 import { getLogoBase64, logPdfError } from '@/lib/pdf-utils';
 import React from 'react';
 
-// Force dynamic generation
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -19,41 +18,34 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       return new NextResponse('Unauthorized', { status: 401 });
     }
 
-    if (!hasAccess(role, 'billing', 'read') && !hasAccess(role, 'pharmacy', 'read')) {
+    if (!hasAccess(role, 'pharmacy', 'read')) {
       return new NextResponse('Forbidden', { status: 403 });
     }
 
     const resolvedParams = await params;
-    
-    // First try fetching as a Sale (for rich distributor format), otherwise as an Invoice
-    const [sale, invoice, settings] = await Promise.all([
-      getSaleById(resolvedParams.id),
-      getInvoiceById(resolvedParams.id),
+
+    const [purchase, settings] = await Promise.all([
+      getPurchaseById(resolvedParams.id),
       getClinicSettings(),
     ]);
 
-    const targetDoc = sale || invoice;
-
-    if (!targetDoc) {
-      return new NextResponse('Invoice / Sale record not found', { status: 404 });
+    if (!purchase) {
+      return new NextResponse('Purchase record not found', { status: 404 });
     }
 
-    const doc = targetDoc as any;
-    const docNo = doc.saleNo || doc.invoiceNo || 'INV';
+    const docNo = purchase.purchaseNo || 'PUR';
     const logoBase64 = getLogoBase64();
 
-    // Render the React-PDF component to a Node stream
     const pdfStream = await renderToStream(
-      <InvoicePDF invoice={targetDoc} settings={settings} logoUrl={logoBase64} />
+      <PurchaseInvoicePDF purchase={purchase} settings={settings} logoUrl={logoBase64} />
     );
 
-    // Convert the Node stream to a Web ReadableStream
     const readableStream = new ReadableStream({
       start(controller) {
         pdfStream.on('data', (chunk) => controller.enqueue(chunk));
         pdfStream.on('end', () => controller.close());
         pdfStream.on('error', (err) => {
-          logPdfError(`Invoice Stream [${docNo}]`, err);
+          logPdfError(`Purchase Stream [${docNo}]`, err);
           controller.error(err);
         });
       },
@@ -62,12 +54,11 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     return new NextResponse(readableStream, {
       headers: {
         'Content-Type': 'application/pdf',
-        'Content-Disposition': `inline; filename="Invoice-${docNo}.pdf"`,
+        'Content-Disposition': `inline; filename="PurchaseInvoice-${docNo}.pdf"`,
       },
     });
   } catch (error: any) {
-    logPdfError('Invoice Route', error);
-    return new NextResponse(`Internal Server Error generating Invoice PDF: ${error?.message || error}`, { status: 500 });
+    logPdfError('Purchase Route', error);
+    return new NextResponse(`Internal Server Error generating Purchase PDF: ${error?.message || error}`, { status: 500 });
   }
 }
-

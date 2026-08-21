@@ -248,6 +248,16 @@ function ensureDatabaseExists() {
         addColumnIfMissing('Settings', 'phone', "TEXT DEFAULT '03439626941'");
         addColumnIfMissing('Settings', 'email', "TEXT DEFAULT 'shakeelbuneri933@gmail.com'");
 
+        // 8. Fix erroneous default reorder levels (100 -> 4)
+        try {
+          const reorderFix = db.prepare('UPDATE "Medicine" SET "reorderLevel" = 4 WHERE "reorderLevel" = 100').run();
+          if (reorderFix.changes > 0) {
+            console.log(`[Electron Migration] Updated ${reorderFix.changes} medicines from reorderLevel=100 to 4.`);
+          }
+        } catch (e) {
+          console.warn('[Electron Migration] Note updating medicine reorder levels:', e.message);
+        }
+
         db.close();
         console.log('[Electron] DB schema auto-migration check completed successfully.');
       } catch (migrateErr) {
@@ -416,11 +426,30 @@ function waitForServer(url, timeoutMs = 25000, intervalMs = 250) {
   });
 }
 
+function getAppIconPath() {
+  const candidates = [
+    path.join(__dirname, '../build/icon.ico'),
+    path.join(__dirname, '../public/icon.png'),
+    path.join(__dirname, '../public/logo.jpeg'),
+    path.join(process.resourcesPath || '', 'build/icon.ico'),
+    path.join(process.resourcesPath || '', 'app/build/icon.ico'),
+    path.join(process.resourcesPath || '', 'app/public/icon.png'),
+  ];
+  for (const c of candidates) {
+    try {
+      if (fs.existsSync(c)) return c;
+    } catch (e) {}
+  }
+  return undefined;
+}
+
 function createWindow(port) {
+  const icon = getAppIconPath();
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 800,
     title: 'Life Care Clinic HMS',
+    icon: icon,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,

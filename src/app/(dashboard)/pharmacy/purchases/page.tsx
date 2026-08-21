@@ -1,8 +1,9 @@
 import { getPurchases } from '@/app/actions/purchase'
-import { Plus, Eye, Edit } from 'lucide-react'
+import { Plus, Eye, Edit, Printer } from 'lucide-react'
 import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { PdfActionButton } from '@/components/common/PdfActionButton'
 
 export const dynamic = 'force-dynamic'
 
@@ -45,7 +46,7 @@ export default async function PurchasesPage() {
                   <div key={purchase.id} className="grid grid-cols-6 items-center p-4">
                     <div className="font-medium">{purchase.purchaseNo}</div>
                     <div>{purchase.supplier?.name || purchase.Supplier?.name || 'Unknown'}</div>
-                    <div>{new Date(purchase.createdAt || new Date()).toLocaleDateString()}</div>
+                    <div>{new Date(purchase.purchaseDate || purchase.createdAt || new Date()).toLocaleDateString()}</div>
                     <div>Rs {purchase.totalAmount?.toFixed(2)}</div>
                     <div>
                       <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
@@ -55,6 +56,17 @@ export default async function PurchasesPage() {
                       </span>
                     </div>
                     <div className="flex items-center justify-end gap-2">
+                      <PdfActionButton
+                        url={`/api/pdf/purchase/${purchase.id}`}
+                        filename={`Purchase-${purchase.purchaseNo || purchase.id}.pdf`}
+                        mode="download"
+                        variant="outline"
+                        size="sm"
+                        title="Print / Download PDF"
+                        showIcon={false}
+                      >
+                        <Printer className="h-3.5 w-3.5 text-primary" />
+                      </PdfActionButton>
                       <Link href={`/pharmacy/purchases/${purchase.id}`}>
                         <Button variant="outline" size="sm">
                           <Eye className="mr-1 h-3.5 w-3.5" />
