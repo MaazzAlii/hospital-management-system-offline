@@ -3,13 +3,21 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Pill, Plus } from "lucide-react";
+import { ArrowLeft, Pill, Plus, CheckCircle2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { updateMedicine, createCategory } from "@/app/actions/medicine";
+import { updateMedicine, createCategory, updateBatch } from "@/app/actions/medicine";
 
 interface CategoryOption {
   id: string;
   name: string;
+}
+
+interface BatchRow {
+  id: string;
+  batchNo: string;
+  expiryDate: string | Date;
+  quantityReceived?: number;
+  quantityRemaining: number;
 }
 
 const inputClass =
@@ -39,12 +47,124 @@ function Field({
   );
 }
 
+function BatchEditRow({ batch }: { batch: BatchRow }) {
+  const [batchNo, setBatchNo] = useState(batch.batchNo || "");
+  const initialDate = batch.expiryDate
+    ? new Date(batch.expiryDate).toISOString().slice(0, 10)
+    : "";
+  const [expiryDate, setExpiryDate] = useState(initialDate);
+  const [isSaving, setIsSaving] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  const handleSave = async () => {
+    const trimmedBatch = batchNo.trim();
+    if (!trimmedBatch) {
+      setErrorMsg("Batch number is required");
+      return;
+    }
+    if (!expiryDate) {
+      setErrorMsg("Expiry date is required");
+      return;
+    }
+
+    setIsSaving(true);
+    setErrorMsg(null);
+    setSuccessMsg(null);
+
+    const res = await updateBatch(batch.id, {
+      batchNo: trimmedBatch,
+      expiryDate,
+    });
+
+    setIsSaving(false);
+    if (res.success) {
+      setSuccessMsg("Saved!");
+      setTimeout(() => setSuccessMsg(null), 3000);
+    } else {
+      setErrorMsg(res.error || "Failed to update batch");
+    }
+  };
+
+  return (
+    <div className="rounded-lg border bg-background p-3.5 shadow-sm space-y-2">
+      <div className="grid gap-3 sm:grid-cols-12 items-end">
+        <div className="sm:col-span-4">
+          <label className="text-xs font-medium text-muted-foreground block mb-1">
+            Batch Number <span className="text-destructive">*</span>
+          </label>
+          <input
+            type="text"
+            value={batchNo}
+            onChange={(e) => setBatchNo(e.target.value)}
+            placeholder="e.g. B-10294"
+            className={inputClass}
+          />
+        </div>
+
+        <div className="sm:col-span-4">
+          <label className="text-xs font-medium text-muted-foreground block mb-1">
+            Expiry Date <span className="text-destructive">*</span>
+          </label>
+          <input
+            type="date"
+            value={expiryDate}
+            onChange={(e) => setExpiryDate(e.target.value)}
+            className={inputClass}
+          />
+        </div>
+
+        <div className="sm:col-span-2">
+          <label className="text-xs font-medium text-muted-foreground block mb-1">
+            Qty Left
+          </label>
+          <div className="h-9 px-3 py-2 rounded-lg bg-muted text-sm font-semibold text-foreground flex items-center justify-center">
+            {batch.quantityRemaining}
+          </div>
+        </div>
+
+        <div className="sm:col-span-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={isSaving}
+            onClick={handleSave}
+            className="w-full h-9"
+          >
+            {isSaving ? "Saving…" : "Save Batch"}
+          </Button>
+        </div>
+      </div>
+
+      {(errorMsg || successMsg) && (
+        <div className="flex items-center gap-1.5 text-xs font-medium pt-0.5">
+          {errorMsg && (
+            <span className="text-destructive flex items-center gap-1">
+              <AlertCircle className="h-3.5 w-3.5" />
+              {errorMsg}
+            </span>
+          )}
+          {successMsg && (
+            <span className="text-success flex items-center gap-1">
+              <CheckCircle2 className="h-3.5 w-3.5" />
+              {successMsg}
+            </span>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function EditMedicineForm({
   medicine,
   categories: initialCategories,
+  batches = [],
 }: {
   medicine: any;
   categories: CategoryOption[];
+  batches?: BatchRow[];
 }) {
   const router = useRouter();
   const [categories, setCategories] = useState<CategoryOption[]>(initialCategories);
@@ -288,6 +408,28 @@ export default function EditMedicineForm({
               />
             </Field>
           </div>
+        </div>
+
+        {/* Batches Section */}
+        <div className="rounded-xl border bg-card p-6 shadow-sm space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-foreground">Stock Batches & Expiry Dates</h2>
+            <span className="text-xs text-muted-foreground">
+              {batches.length} {batches.length === 1 ? "batch" : "batches"} recorded
+            </span>
+          </div>
+
+          {batches.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No stock batches recorded for this medicine yet.
+            </p>
+          ) : (
+            <div className="max-h-80 overflow-y-auto space-y-3 pr-1">
+              {batches.map((b) => (
+                <BatchEditRow key={b.id} batch={b} />
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="flex items-center justify-end gap-3">

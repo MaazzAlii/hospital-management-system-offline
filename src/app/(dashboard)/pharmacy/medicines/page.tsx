@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Plus, Pill, AlertTriangle, Pencil } from "lucide-react";
-import { getMedicines } from "@/app/actions/medicine";
+import { getMedicines, getLowStockCount } from "@/app/actions/medicine";
 import { Button } from "@/components/ui/button";
 
 export const dynamic = "force-dynamic";

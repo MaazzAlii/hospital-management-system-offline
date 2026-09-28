@@ -278,6 +278,65 @@ export async function getMedicineById(id: string) {
   }
 }
 
+export async function getMedicineBatches(medicineId: string) {
+  try {
+    const { role } = await getCurrentUserRole();
+    if (!hasAccess(role, 'pharmacy', 'read')) return [];
+
+    return await prisma.batch.findMany({
+      where: { medicineId },
+      orderBy: { expiryDate: "asc" },
+    });
+  } catch (error) {
+    console.error("Failed to fetch batches:", error);
+    return [];
+  }
+}
+
+export async function updateBatch(id: string, data: { batchNo: string; expiryDate: string }) {
+  try {
+    const { role } = await getCurrentUserRole();
+    if (!hasAccess(role, 'pharmacy', 'write')) {
+      throw new Error("Unauthorized to update batch");
+    }
+
+    const batchNo = data.batchNo?.trim();
+    if (!batchNo) throw new Error("Batch number is required");
+
+    const expiryDate = new Date(data.expiryDate);
+    if (isNaN(expiryDate.getTime())) throw new Error("Invalid expiry date");
+
+    const existing = await prisma.batch.findUnique({ where: { id } });
+    if (!existing) throw new Error("Batch not found");
+
+    const updated = await prisma.$transaction(async (tx) => {
+      const batch = await tx.batch.update({
+        where: { id },
+        data: { batchNo, expiryDate },
+      });
+
+      // Keep the linked purchase-invoice record in sync, so the purchase history / printed
+      // purchase invoice doesn't show a stale batch number or expiry date after this edit.
+      if (existing.purchaseItemId) {
+        await tx.purchaseItem.update({
+          where: { id: existing.purchaseItemId },
+          data: { batchNo, expiryDate },
+        });
+      }
+
+      return batch;
+    });
+
+    revalidatePath("/pharmacy/medicines");
+    revalidatePath(`/pharmacy/medicines/${updated.medicineId}/edit`);
+    revalidatePath("/pharmacy/expiry-report");
+    return { success: true, batch: updated };
+  } catch (error: unknown) {
+    console.error("Failed to update batch:", error);
+    return { success: false, error: getErrorMessage(error, "Failed to update batch") };
+  }
+}
+
 export async function updateMedicine(id: string, data: {
   name: string;
   categoryId: string;
