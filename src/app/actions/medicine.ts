@@ -136,14 +136,14 @@ export async function createMedicine(data: {
   }
 }
 
-export async function getMedicines(query?: string) {
+export async function getMedicines(query?: string, page: number = 1, pageSize: number = 50) {
   try {
     const { role } = await getCurrentUserRole();
     if (!hasAccess(role, 'pharmacy', 'read')) {
       throw new Error('Unauthorized to view medicines');
     }
 
-    let whereClause: any = {};
+    const whereClause: any = {};
     if (query) {
       whereClause.OR = [
         { name: { contains: query } },
@@ -152,40 +152,57 @@ export async function getMedicines(query?: string) {
       ];
     }
 
-    const rawMedicines = await prisma.medicine.findMany({
+    // Total count for the summary card + pagination — a single COUNT(*), never scales badly.
+    const totalCount = await prisma.medicine.count({ where: whereClause });
+
+    // Only fetch ONE PAGE of medicines. skip/take keeps this query's cost flat forever.
+    const pageMedicines = await prisma.medicine.findMany({
       where: whereClause,
       include: {
-        category: {
-          select: { id: true, name: true },
-        },
-        stockMovements: {
-          select: { quantity: true },
-        },
-        batches: {
-          where: {
-            quantityRemaining: { gt: 0 },
-          },
-          orderBy: { expiryDate: "asc" },
-        },
+        category: { select: { id: true, name: true } },
       },
       orderBy: { name: "asc" },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
     });
+
+    const medicineIds = pageMedicines.map((m) => m.id);
+
+    // Aggregate stock in SQL, scoped ONLY to this page's medicine IDs (max = pageSize, e.g. 50).
+    // This IN(...) list can never grow past pageSize, no matter how large the catalog gets.
+    const stockAggregates = medicineIds.length
+      ? await prisma.stockMovement.groupBy({
+          by: ['medicineId'],
+          where: { medicineId: { in: medicineIds } },
+          _sum: { quantity: true },
+        })
+      : [];
+    const stockByMedicine = new Map(stockAggregates.map((s) => [s.medicineId, s._sum.quantity ?? 0]));
+
+    // Batches, also scoped only to this page.
+    const batches = medicineIds.length
+      ? await prisma.batch.findMany({
+          where: { medicineId: { in: medicineIds }, quantityRemaining: { gt: 0 } },
+          orderBy: { expiryDate: "asc" },
+        })
+      : [];
+    const batchesByMedicine = new Map<string, typeof batches>();
+    for (const b of batches) {
+      if (!batchesByMedicine.has(b.medicineId)) batchesByMedicine.set(b.medicineId, []);
+      batchesByMedicine.get(b.medicineId)!.push(b);
+    }
 
     const now = new Date();
     const ninetyDaysFromNow = new Date();
     ninetyDaysFromNow.setDate(ninetyDaysFromNow.getDate() + 90);
 
-    return rawMedicines.map((m) => {
-      const currentStock = m.stockMovements.reduce((sum, sm) => sum + sm.quantity, 0);
-      const batches = m.batches.map((b) => {
+    const medicines = pageMedicines.map((m) => {
+      const currentStock = stockByMedicine.get(m.id) ?? 0;
+      const medBatches = (batchesByMedicine.get(m.id) ?? []).map((b) => {
         const expDate = new Date(b.expiryDate);
         let expiryStatus: 'expired' | 'expiring_soon' | 'valid' = 'valid';
-        if (expDate < now) {
-          expiryStatus = 'expired';
-        } else if (expDate <= ninetyDaysFromNow) {
-          expiryStatus = 'expiring_soon';
-        }
-
+        if (expDate < now) expiryStatus = 'expired';
+        else if (expDate <= ninetyDaysFromNow) expiryStatus = 'expiring_soon';
         return {
           id: b.id,
           batchNo: b.batchNo,
@@ -209,12 +226,38 @@ export async function getMedicines(query?: string) {
         reorderLevel: m.reorderLevel,
         isLowStock: currentStock <= m.reorderLevel,
         isActive: true,
-        batches,
+        batches: medBatches,
       };
     });
+
+    return { medicines, totalCount, page, pageSize, totalPages: Math.max(1, Math.ceil(totalCount / pageSize)) };
   } catch (error: unknown) {
+    // Do NOT return a silently-empty success shape. Surface the failure so it's visible,
+    // not indistinguishable from "zero medicines exist".
     console.error("Failed to get medicines:", error);
-    return [];
+    return { medicines: [], totalCount: 0, page: 1, pageSize, totalPages: 1, error: getErrorMessage(error, "Failed to load medicines") };
+  }
+}
+
+export async function getLowStockCount() {
+  try {
+    const { role } = await getCurrentUserRole();
+    if (!hasAccess(role, 'pharmacy', 'read')) return 0;
+
+    // Sum stock per medicine in SQL, compare to each medicine's own reorderLevel, count matches.
+    const medicines = await prisma.medicine.findMany({ select: { id: true, reorderLevel: true } });
+    if (medicines.length === 0) return 0;
+
+    const aggregates = await prisma.stockMovement.groupBy({
+      by: ['medicineId'],
+      _sum: { quantity: true },
+    });
+    const stockByMedicine = new Map(aggregates.map((s) => [s.medicineId, s._sum.quantity ?? 0]));
+
+    return medicines.filter((m) => (stockByMedicine.get(m.id) ?? 0) <= m.reorderLevel).length;
+  } catch (error) {
+    console.error("Failed to compute low stock count:", error);
+    return 0;
   }
 }
 

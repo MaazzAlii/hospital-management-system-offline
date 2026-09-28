@@ -72,14 +72,18 @@ function MedicineTableRow({ med }: { med: MedicineRow }) {
 export default async function MedicinesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string }>;
+  searchParams: Promise<{ q?: string; page?: string }>;
 }) {
   const resolvedSearchParams = await searchParams;
   const query = resolvedSearchParams?.q || "";
-  const medicines = await getMedicines(query);
+  const page = Math.max(1, parseInt(resolvedSearchParams?.page || "1", 10) || 1);
 
-  const totalMedicines = medicines.length;
-  const lowStockCount = medicines.filter(m => m.isLowStock).length;
+  const [result, lowStockCount] = await Promise.all([
+    getMedicines(query, page, 50),
+    getLowStockCount(),
+  ]);
+
+  const { medicines, totalCount, totalPages, error } = result;
 
   return (
     <div className="space-y-5">
@@ -99,11 +103,19 @@ export default async function MedicinesPage({
         </Link>
       </div>
 
+      {/* Error Alert */}
+      {error && (
+        <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive font-medium flex items-center gap-2">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          <span>Couldn&apos;t load medicines: {error}. Check server logs.</span>
+        </div>
+      )}
+
       {/* Summary cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <div className="rounded-xl border bg-card p-4 shadow-sm">
           <p className="text-xs text-muted-foreground mb-1">Total Medicines</p>
-          <p className="text-2xl font-bold tracking-tight">{totalMedicines}</p>
+          <p className="text-2xl font-bold tracking-tight">{totalCount}</p>
         </div>
         <div className="rounded-xl border bg-card p-4 shadow-sm">
           <p className="text-xs text-muted-foreground mb-1">Low Stock Alerts</p>
@@ -176,7 +188,9 @@ export default async function MedicinesPage({
                     colSpan={8}
                     className="px-4 py-12 text-center text-sm text-muted-foreground"
                   >
-                    {query
+                    {error
+                      ? "Couldn't load medicines — see server logs."
+                      : query
                       ? `No medicines found matching "${query}".`
                       : 'No medicines registered yet. Click "Add Medicine" to get started.'}
                   </td>
@@ -186,6 +200,34 @@ export default async function MedicinesPage({
           </table>
         </div>
       </div>
+
+      {/* Pagination Controls */}
+      {totalPages > 1 && (
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-2">
+          <p className="text-sm text-muted-foreground">
+            Showing page <span className="font-medium text-foreground">{page}</span> of{" "}
+            <span className="font-medium text-foreground">{totalPages}</span> ({totalCount} total medicines)
+          </p>
+          <div className="flex items-center gap-2">
+            <Link
+              href={`/pharmacy/medicines?${new URLSearchParams({ ...(query ? { q: query } : {}), page: String(page - 1) }).toString()}`}
+              className={page <= 1 ? "pointer-events-none opacity-50" : ""}
+            >
+              <Button variant="outline" size="sm" disabled={page <= 1}>
+                Previous
+              </Button>
+            </Link>
+            <Link
+              href={`/pharmacy/medicines?${new URLSearchParams({ ...(query ? { q: query } : {}), page: String(page + 1) }).toString()}`}
+              className={page >= totalPages ? "pointer-events-none opacity-50" : ""}
+            >
+              <Button variant="outline" size="sm" disabled={page >= totalPages}>
+                Next
+              </Button>
+            </Link>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

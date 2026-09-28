@@ -5,10 +5,12 @@ import { PurchaseForm } from './form'
 export const dynamic = 'force-dynamic'
 
 export default async function NewPurchasePage() {
-  const [suppliers, medicines] = await Promise.all([
+  const [suppliers, medicinesRes] = await Promise.all([
     getSuppliers(),
-    getMedicines()
+    getMedicines(undefined, 1, 1000)
   ])
+
+  const medicines = Array.isArray(medicinesRes) ? medicinesRes : (medicinesRes?.medicines || [])
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
@@ -18,7 +20,7 @@ export default async function NewPurchasePage() {
       
       <PurchaseForm 
         suppliers={suppliers || []} 
-        medicines={medicines || []} 
+        medicines={medicines} 
       />
     </div>
   )

@@ -6,11 +6,13 @@ import { SaleForm } from './form'
 export const dynamic = 'force-dynamic'
 
 export default async function NewSalePage() {
-  const [patients, medicines, settings] = await Promise.all([
+  const [patients, medicinesRes, settings] = await Promise.all([
     getPatients(),
-    getMedicines(),
+    getMedicines(undefined, 1, 1000),
     getClinicSettings(),
   ])
+
+  const medicines = Array.isArray(medicinesRes) ? medicinesRes : (medicinesRes?.medicines || [])
 
   return (
     <div className="mx-auto max-w-7xl space-y-6">
@@ -25,7 +27,7 @@ export default async function NewSalePage() {
       
       <SaleForm 
         patients={patients || []} 
-        medicines={medicines || []} 
+        medicines={medicines} 
         settings={settings || { clinicName: 'Life Care Pharmacy' }}
       />
     </div>
