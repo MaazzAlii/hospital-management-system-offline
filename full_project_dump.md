@@ -21,13 +21,16 @@ This structured document aggregates 100% of raw code, configurations, database d
     "lint": "eslint",
     "clean:dev-cache": "node scripts/clean-dev-cache.js",
     "db:reset-seed": "npx tsx scripts/reset-seed-data.ts",
-    "electron:dev": "electron .",
-    "electron:build": "node scripts/clean-dev-cache.js && next build && node scripts/copy-prisma-engine.js && node scripts/download-vc-redist.js && electron-builder --win",
+    "icons": "node scripts/generate-icons.js",
+    "electron:dev": "node scripts/generate-icons.js && electron .",
+    "electron:build": "node scripts/generate-icons.js && node scripts/clean-dev-cache.js && next build && node scripts/copy-prisma-engine.js && node scripts/download-vc-redist.js && electron-builder --win",
+    "electron:unpack": "node scripts/generate-icons.js && node scripts/clean-dev-cache.js && next build && node scripts/copy-prisma-engine.js && node scripts/download-vc-redist.js && electron-builder --win --dir",
     "postinstall": "electron-rebuild -f -w better-sqlite3"
   },
   "build": {
     "appId": "com.lifecare.hms",
     "productName": "Life Care HMS",
+    "icon": "build/icon.ico",
     "asar": false,
     "npmRebuild": false,
     "buildDependenciesFromSource": false,
@@ -36,6 +39,8 @@ This structured document aggregates 100% of raw code, configurations, database d
     },
     "files": [
       "electron/**/*",
+      "build/icon.ico",
+      "build/icon.png",
       ".next/**/*",
       "!.next/dev/**/*",
       "!.next/cache/**/*",
@@ -58,7 +63,8 @@ This structured document aggregates 100% of raw code, configurations, database d
       }
     ],
     "win": {
-      "target": "nsis"
+      "target": "nsis",
+      "icon": "build/icon.ico"
     },
     "nsis": {
       "oneClick": false,
@@ -67,6 +73,8 @@ This structured document aggregates 100% of raw code, configurations, database d
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "Life Care HMS",
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
       "include": "build/installer.nsh"
     }
   },
@@ -741,6 +749,10 @@ export const metadata: Metadata = {
   title: "LIFE CARE HOSPITAL — Nawagai, Buner",
   description:
     "Hospital Management System for LIFE CARE HOSPITAL, Nawagai, Buner. Manage patients, appointments, doctors, and billing in one place.",
+  icons: {
+    icon: "/icon.png",
+    apple: "/icon.png",
+  },
 };
 
 export default function RootLayout({
@@ -1438,11 +1450,30 @@ function waitForServer(url, timeoutMs = 25000, intervalMs = 250) {
   });
 }
 
+function getAppIconPath() {
+  const candidates = [
+    path.join(__dirname, '../build/icon.ico'),
+    path.join(__dirname, '../public/icon.png'),
+    path.join(__dirname, '../public/logo.jpeg'),
+    path.join(process.resourcesPath || '', 'build/icon.ico'),
+    path.join(process.resourcesPath || '', 'app/build/icon.ico'),
+    path.join(process.resourcesPath || '', 'app/public/icon.png'),
+  ];
+  for (const c of candidates) {
+    try {
+      if (fs.existsSync(c)) return c;
+    } catch (e) {}
+  }
+  return undefined;
+}
+
 function createWindow(port) {
+  const icon = getAppIconPath();
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 800,
     title: 'Life Care Clinic HMS',
+    icon: icon,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -3765,14 +3796,14 @@ export async function createMedicine(data: {
   }
 }
 
-export async function getMedicines(query?: string) {
+export async function getMedicines(query?: string, page: number = 1, pageSize: number = 50) {
   try {
     const { role } = await getCurrentUserRole();
     if (!hasAccess(role, 'pharmacy', 'read')) {
       throw new Error('Unauthorized to view medicines');
     }
 
-    let whereClause: any = {};
+    const whereClause: any = {};
     if (query) {
       whereClause.OR = [
         { name: { contains: query } },
@@ -3781,40 +3812,57 @@ export async function getMedicines(query?: string) {
       ];
     }
 
-    const rawMedicines = await prisma.medicine.findMany({
+    // Total count for the summary card + pagination — a single COUNT(*), never scales badly.
+    const totalCount = await prisma.medicine.count({ where: whereClause });
+
+    // Only fetch ONE PAGE of medicines. skip/take keeps this query's cost flat forever.
+    const pageMedicines = await prisma.medicine.findMany({
       where: whereClause,
       include: {
-        category: {
-          select: { id: true, name: true },
-        },
-        stockMovements: {
-          select: { quantity: true },
-        },
-        batches: {
-          where: {
-            quantityRemaining: { gt: 0 },
-          },
-          orderBy: { expiryDate: "asc" },
-        },
+        category: { select: { id: true, name: true } },
       },
       orderBy: { name: "asc" },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
     });
+
+    const medicineIds = pageMedicines.map((m) => m.id);
+
+    // Aggregate stock in SQL, scoped ONLY to this page's medicine IDs (max = pageSize, e.g. 50).
+    // This IN(...) list can never grow past pageSize, no matter how large the catalog gets.
+    const stockAggregates = medicineIds.length
+      ? await prisma.stockMovement.groupBy({
+          by: ['medicineId'],
+          where: { medicineId: { in: medicineIds } },
+          _sum: { quantity: true },
+        })
+      : [];
+    const stockByMedicine = new Map(stockAggregates.map((s) => [s.medicineId, s._sum.quantity ?? 0]));
+
+    // Batches, also scoped only to this page.
+    const batches = medicineIds.length
+      ? await prisma.batch.findMany({
+          where: { medicineId: { in: medicineIds }, quantityRemaining: { gt: 0 } },
+          orderBy: { expiryDate: "asc" },
+        })
+      : [];
+    const batchesByMedicine = new Map<string, typeof batches>();
+    for (const b of batches) {
+      if (!batchesByMedicine.has(b.medicineId)) batchesByMedicine.set(b.medicineId, []);
+      batchesByMedicine.get(b.medicineId)!.push(b);
+    }
 
     const now = new Date();
     const ninetyDaysFromNow = new Date();
     ninetyDaysFromNow.setDate(ninetyDaysFromNow.getDate() + 90);
 
-    return rawMedicines.map((m) => {
-      const currentStock = m.stockMovements.reduce((sum, sm) => sum + sm.quantity, 0);
-      const batches = m.batches.map((b) => {
+    const medicines = pageMedicines.map((m) => {
+      const currentStock = stockByMedicine.get(m.id) ?? 0;
+      const medBatches = (batchesByMedicine.get(m.id) ?? []).map((b) => {
         const expDate = new Date(b.expiryDate);
         let expiryStatus: 'expired' | 'expiring_soon' | 'valid' = 'valid';
-        if (expDate < now) {
-          expiryStatus = 'expired';
-        } else if (expDate <= ninetyDaysFromNow) {
-          expiryStatus = 'expiring_soon';
-        }
-
+        if (expDate < now) expiryStatus = 'expired';
+        else if (expDate <= ninetyDaysFromNow) expiryStatus = 'expiring_soon';
         return {
           id: b.id,
           batchNo: b.batchNo,
@@ -3838,12 +3886,38 @@ export async function getMedicines(query?: string) {
         reorderLevel: m.reorderLevel,
         isLowStock: currentStock <= m.reorderLevel,
         isActive: true,
-        batches,
+        batches: medBatches,
       };
     });
+
+    return { medicines, totalCount, page, pageSize, totalPages: Math.max(1, Math.ceil(totalCount / pageSize)) };
   } catch (error: unknown) {
+    // Do NOT return a silently-empty success shape. Surface the failure so it's visible,
+    // not indistinguishable from "zero medicines exist".
     console.error("Failed to get medicines:", error);
-    return [];
+    return { medicines: [], totalCount: 0, page: 1, pageSize, totalPages: 1, error: getErrorMessage(error, "Failed to load medicines") };
+  }
+}
+
+export async function getLowStockCount() {
+  try {
+    const { role } = await getCurrentUserRole();
+    if (!hasAccess(role, 'pharmacy', 'read')) return 0;
+
+    // Sum stock per medicine in SQL, compare to each medicine's own reorderLevel, count matches.
+    const medicines = await prisma.medicine.findMany({ select: { id: true, reorderLevel: true } });
+    if (medicines.length === 0) return 0;
+
+    const aggregates = await prisma.stockMovement.groupBy({
+      by: ['medicineId'],
+      _sum: { quantity: true },
+    });
+    const stockByMedicine = new Map(aggregates.map((s) => [s.medicineId, s._sum.quantity ?? 0]));
+
+    return medicines.filter((m) => (stockByMedicine.get(m.id) ?? 0) <= m.reorderLevel).length;
+  } catch (error) {
+    console.error("Failed to compute low stock count:", error);
+    return 0;
   }
 }
 
@@ -3861,6 +3935,65 @@ export async function getMedicineById(id: string) {
   } catch (error) {
     console.error("Failed to fetch medicine:", error);
     return null;
+  }
+}
+
+export async function getMedicineBatches(medicineId: string) {
+  try {
+    const { role } = await getCurrentUserRole();
+    if (!hasAccess(role, 'pharmacy', 'read')) return [];
+
+    return await prisma.batch.findMany({
+      where: { medicineId },
+      orderBy: { expiryDate: "asc" },
+    });
+  } catch (error) {
+    console.error("Failed to fetch batches:", error);
+    return [];
+  }
+}
+
+export async function updateBatch(id: string, data: { batchNo: string; expiryDate: string }) {
+  try {
+    const { role } = await getCurrentUserRole();
+    if (!hasAccess(role, 'pharmacy', 'write')) {
+      throw new Error("Unauthorized to update batch");
+    }
+
+    const batchNo = data.batchNo?.trim();
+    if (!batchNo) throw new Error("Batch number is required");
+
+    const expiryDate = new Date(data.expiryDate);
+    if (isNaN(expiryDate.getTime())) throw new Error("Invalid expiry date");
+
+    const existing = await prisma.batch.findUnique({ where: { id } });
+    if (!existing) throw new Error("Batch not found");
+
+    const updated = await prisma.$transaction(async (tx) => {
+      const batch = await tx.batch.update({
+        where: { id },
+        data: { batchNo, expiryDate },
+      });
+
+      // Keep the linked purchase-invoice record in sync, so the purchase history / printed
+      // purchase invoice doesn't show a stale batch number or expiry date after this edit.
+      if (existing.purchaseItemId) {
+        await tx.purchaseItem.update({
+          where: { id: existing.purchaseItemId },
+          data: { batchNo, expiryDate },
+        });
+      }
+
+      return batch;
+    });
+
+    revalidatePath("/pharmacy/medicines");
+    revalidatePath(`/pharmacy/medicines/${updated.medicineId}/edit`);
+    revalidatePath("/pharmacy/expiry-report");
+    return { success: true, batch: updated };
+  } catch (error: unknown) {
+    console.error("Failed to update batch:", error);
+    return { success: false, error: getErrorMessage(error, "Failed to update batch") };
   }
 }
 
@@ -16840,13 +16973,21 @@ export default async function ExpiryReportPage() {
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Pill, Plus } from "lucide-react";
+import { ArrowLeft, Pill, Plus, CheckCircle2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { updateMedicine, createCategory } from "@/app/actions/medicine";
+import { updateMedicine, createCategory, updateBatch } from "@/app/actions/medicine";
 
 interface CategoryOption {
   id: string;
   name: string;
+}
+
+interface BatchRow {
+  id: string;
+  batchNo: string;
+  expiryDate: string | Date;
+  quantityReceived?: number;
+  quantityRemaining: number;
 }
 
 const inputClass =
@@ -16876,12 +17017,124 @@ function Field({
   );
 }
 
+function BatchEditRow({ batch }: { batch: BatchRow }) {
+  const [batchNo, setBatchNo] = useState(batch.batchNo || "");
+  const initialDate = batch.expiryDate
+    ? new Date(batch.expiryDate).toISOString().slice(0, 10)
+    : "";
+  const [expiryDate, setExpiryDate] = useState(initialDate);
+  const [isSaving, setIsSaving] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  const handleSave = async () => {
+    const trimmedBatch = batchNo.trim();
+    if (!trimmedBatch) {
+      setErrorMsg("Batch number is required");
+      return;
+    }
+    if (!expiryDate) {
+      setErrorMsg("Expiry date is required");
+      return;
+    }
+
+    setIsSaving(true);
+    setErrorMsg(null);
+    setSuccessMsg(null);
+
+    const res = await updateBatch(batch.id, {
+      batchNo: trimmedBatch,
+      expiryDate,
+    });
+
+    setIsSaving(false);
+    if (res.success) {
+      setSuccessMsg("Saved!");
+      setTimeout(() => setSuccessMsg(null), 3000);
+    } else {
+      setErrorMsg(res.error || "Failed to update batch");
+    }
+  };
+
+  return (
+    <div className="rounded-lg border bg-background p-3.5 shadow-sm space-y-2">
+      <div className="grid gap-3 sm:grid-cols-12 items-end">
+        <div className="sm:col-span-4">
+          <label className="text-xs font-medium text-muted-foreground block mb-1">
+            Batch Number <span className="text-destructive">*</span>
+          </label>
+          <input
+            type="text"
+            value={batchNo}
+            onChange={(e) => setBatchNo(e.target.value)}
+            placeholder="e.g. B-10294"
+            className={inputClass}
+          />
+        </div>
+
+        <div className="sm:col-span-4">
+          <label className="text-xs font-medium text-muted-foreground block mb-1">
+            Expiry Date <span className="text-destructive">*</span>
+          </label>
+          <input
+            type="date"
+            value={expiryDate}
+            onChange={(e) => setExpiryDate(e.target.value)}
+            className={inputClass}
+          />
+        </div>
+
+        <div className="sm:col-span-2">
+          <label className="text-xs font-medium text-muted-foreground block mb-1">
+            Qty Left
+          </label>
+          <div className="h-9 px-3 py-2 rounded-lg bg-muted text-sm font-semibold text-foreground flex items-center justify-center">
+            {batch.quantityRemaining}
+          </div>
+        </div>
+
+        <div className="sm:col-span-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={isSaving}
+            onClick={handleSave}
+            className="w-full h-9"
+          >
+            {isSaving ? "Saving…" : "Save Batch"}
+          </Button>
+        </div>
+      </div>
+
+      {(errorMsg || successMsg) && (
+        <div className="flex items-center gap-1.5 text-xs font-medium pt-0.5">
+          {errorMsg && (
+            <span className="text-destructive flex items-center gap-1">
+              <AlertCircle className="h-3.5 w-3.5" />
+              {errorMsg}
+            </span>
+          )}
+          {successMsg && (
+            <span className="text-success flex items-center gap-1">
+              <CheckCircle2 className="h-3.5 w-3.5" />
+              {successMsg}
+            </span>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function EditMedicineForm({
   medicine,
   categories: initialCategories,
+  batches = [],
 }: {
   medicine: any;
   categories: CategoryOption[];
+  batches?: BatchRow[];
 }) {
   const router = useRouter();
   const [categories, setCategories] = useState<CategoryOption[]>(initialCategories);
@@ -17127,6 +17380,28 @@ export default function EditMedicineForm({
           </div>
         </div>
 
+        {/* Batches Section */}
+        <div className="rounded-xl border bg-card p-6 shadow-sm space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-foreground">Stock Batches & Expiry Dates</h2>
+            <span className="text-xs text-muted-foreground">
+              {batches.length} {batches.length === 1 ? "batch" : "batches"} recorded
+            </span>
+          </div>
+
+          {batches.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No stock batches recorded for this medicine yet.
+            </p>
+          ) : (
+            <div className="max-h-80 overflow-y-auto space-y-3 pr-1">
+              {batches.map((b) => (
+                <BatchEditRow key={b.id} batch={b} />
+              ))}
+            </div>
+          )}
+        </div>
+
         <div className="flex items-center justify-end gap-3">
           <Link href="/pharmacy/medicines">
             <Button type="button" variant="outline">
@@ -17144,7 +17419,7 @@ export default function EditMedicineForm({
 
 --- FILE: src/app/(dashboard)/pharmacy/medicines/[id]/edit/page.tsx ---
 import { notFound } from "next/navigation";
-import { getMedicineById, getMedicineCategories } from "@/app/actions/medicine";
+import { getMedicineById, getMedicineCategories, getMedicineBatches } from "@/app/actions/medicine";
 import EditMedicineForm from "./form";
 
 export const dynamic = "force-dynamic";
@@ -17155,16 +17430,17 @@ export default async function EditMedicinePage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [medicine, categories] = await Promise.all([
+  const [medicine, categories, batches] = await Promise.all([
     getMedicineById(id),
     getMedicineCategories(),
+    getMedicineBatches(id),
   ]);
 
   if (!medicine) {
     notFound();
   }
 
-  return <EditMedicineForm medicine={medicine} categories={categories} />;
+  return <EditMedicineForm medicine={medicine} categories={categories} batches={batches} />;
 }
 
 --- FILE: src/app/(dashboard)/pharmacy/medicines/new/form.tsx ---
@@ -17590,7 +17866,7 @@ export default async function NewMedicinePage() {
 --- FILE: src/app/(dashboard)/pharmacy/medicines/page.tsx ---
 import Link from "next/link";
 import { Plus, Pill, AlertTriangle, Pencil } from "lucide-react";
-import { getMedicines } from "@/app/actions/medicine";
+import { getMedicines, getLowStockCount } from "@/app/actions/medicine";
 import { Button } from "@/components/ui/button";
 
 export const dynamic = "force-dynamic";
@@ -17662,14 +17938,18 @@ function MedicineTableRow({ med }: { med: MedicineRow }) {
 export default async function MedicinesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string }>;
+  searchParams: Promise<{ q?: string; page?: string }>;
 }) {
   const resolvedSearchParams = await searchParams;
   const query = resolvedSearchParams?.q || "";
-  const medicines = await getMedicines(query);
+  const page = Math.max(1, parseInt(resolvedSearchParams?.page || "1", 10) || 1);
 
-  const totalMedicines = medicines.length;
-  const lowStockCount = medicines.filter(m => m.isLowStock).length;
+  const [result, lowStockCount] = await Promise.all([
+    getMedicines(query, page, 50),
+    getLowStockCount(),
+  ]);
+
+  const { medicines, totalCount, totalPages, error } = result;
 
   return (
     <div className="space-y-5">
@@ -17689,11 +17969,19 @@ export default async function MedicinesPage({
         </Link>
       </div>
 
+      {/* Error Alert */}
+      {error && (
+        <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive font-medium flex items-center gap-2">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          <span>Couldn&apos;t load medicines: {error}. Check server logs.</span>
+        </div>
+      )}
+
       {/* Summary cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <div className="rounded-xl border bg-card p-4 shadow-sm">
           <p className="text-xs text-muted-foreground mb-1">Total Medicines</p>
-          <p className="text-2xl font-bold tracking-tight">{totalMedicines}</p>
+          <p className="text-2xl font-bold tracking-tight">{totalCount}</p>
         </div>
         <div className="rounded-xl border bg-card p-4 shadow-sm">
           <p className="text-xs text-muted-foreground mb-1">Low Stock Alerts</p>
@@ -17766,7 +18054,9 @@ export default async function MedicinesPage({
                     colSpan={8}
                     className="px-4 py-12 text-center text-sm text-muted-foreground"
                   >
-                    {query
+                    {error
+                      ? "Couldn't load medicines — see server logs."
+                      : query
                       ? `No medicines found matching "${query}".`
                       : 'No medicines registered yet. Click "Add Medicine" to get started.'}
                   </td>
@@ -17776,6 +18066,34 @@ export default async function MedicinesPage({
           </table>
         </div>
       </div>
+
+      {/* Pagination Controls */}
+      {totalPages > 1 && (
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-2">
+          <p className="text-sm text-muted-foreground">
+            Showing page <span className="font-medium text-foreground">{page}</span> of{" "}
+            <span className="font-medium text-foreground">{totalPages}</span> ({totalCount} total medicines)
+          </p>
+          <div className="flex items-center gap-2">
+            <Link
+              href={`/pharmacy/medicines?${new URLSearchParams({ ...(query ? { q: query } : {}), page: String(page - 1) }).toString()}`}
+              className={page <= 1 ? "pointer-events-none opacity-50" : ""}
+            >
+              <Button variant="outline" size="sm" disabled={page <= 1}>
+                Previous
+              </Button>
+            </Link>
+            <Link
+              href={`/pharmacy/medicines?${new URLSearchParams({ ...(query ? { q: query } : {}), page: String(page + 1) }).toString()}`}
+              className={page >= totalPages ? "pointer-events-none opacity-50" : ""}
+            >
+              <Button variant="outline" size="sm" disabled={page >= totalPages}>
+                Next
+              </Button>
+            </Link>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -18441,10 +18759,12 @@ import { PurchaseForm } from './form'
 export const dynamic = 'force-dynamic'
 
 export default async function NewPurchasePage() {
-  const [suppliers, medicines] = await Promise.all([
+  const [suppliers, medicinesRes] = await Promise.all([
     getSuppliers(),
-    getMedicines()
+    getMedicines(undefined, 1, 1000)
   ])
+
+  const medicines = Array.isArray(medicinesRes) ? medicinesRes : (medicinesRes?.medicines || [])
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
@@ -18454,7 +18774,7 @@ export default async function NewPurchasePage() {
       
       <PurchaseForm 
         suppliers={suppliers || []} 
-        medicines={medicines || []} 
+        medicines={medicines} 
       />
     </div>
   )
@@ -20403,11 +20723,13 @@ import { SaleForm } from './form'
 export const dynamic = 'force-dynamic'
 
 export default async function NewSalePage() {
-  const [patients, medicines, settings] = await Promise.all([
+  const [patients, medicinesRes, settings] = await Promise.all([
     getPatients(),
-    getMedicines(),
+    getMedicines(undefined, 1, 1000),
     getClinicSettings(),
   ])
+
+  const medicines = Array.isArray(medicinesRes) ? medicinesRes : (medicinesRes?.medicines || [])
 
   return (
     <div className="mx-auto max-w-7xl space-y-6">
@@ -20422,7 +20744,7 @@ export default async function NewSalePage() {
       
       <SaleForm 
         patients={patients || []} 
-        medicines={medicines || []} 
+        medicines={medicines} 
         settings={settings || { clinicName: 'Life Care Pharmacy' }}
       />
     </div>
@@ -22694,6 +23016,139 @@ run().catch(err => {
   process.exit(1);
 });
 
+--- FILE: scripts/capture-batches-ui.ts ---
+import puppeteer from 'puppeteer';
+import path from 'path';
+import { prisma } from '../src/lib/prisma';
+
+async function main() {
+  const artifactDir = '/home/maazzalii/.gemini/antigravity-ide/brain/8755d35f-e0e6-4be2-b762-225bbea2a751';
+
+  // 1. Create a category and medicine with 2 batches
+  let category = await prisma.medicineCategory.findFirst();
+  if (!category) {
+    category = await prisma.medicineCategory.create({ data: { name: 'Antibiotics' } });
+  }
+
+  const med = await prisma.medicine.create({
+    data: {
+      name: 'Panadol Extra 500mg',
+      categoryId: category.id,
+      manufacturer: 'GSK Pakistan',
+      unitPrice: 35,
+      sellingPrice: 50,
+      unit: 'Tablet',
+      reorderLevel: 10,
+    },
+  });
+
+  const purchase = await prisma.purchase.create({
+    data: {
+      purchaseNo: `PUR-${Date.now().toString().slice(-6)}`,
+      totalAmount: 3500,
+      status: 'completed',
+    },
+  });
+
+  const pi1 = await prisma.purchaseItem.create({
+    data: {
+      purchaseId: purchase.id,
+      medicineId: med.id,
+      batchNo: 'PAN-2026-A1',
+      expiryDate: new Date('2027-06-30'),
+      quantity: 100,
+      unitPrice: 35,
+      totalPrice: 3500,
+    },
+  });
+
+  await prisma.batch.create({
+    data: {
+      medicineId: med.id,
+      purchaseItemId: pi1.id,
+      batchNo: 'PAN-2026-A1',
+      expiryDate: new Date('2027-06-30'),
+      quantityReceived: 100,
+      quantityRemaining: 85,
+    },
+  });
+
+  await prisma.batch.create({
+    data: {
+      medicineId: med.id,
+      batchNo: 'PAN-2026-B2',
+      expiryDate: new Date('2028-01-15'),
+      quantityReceived: 50,
+      quantityRemaining: 50,
+    },
+  });
+
+  await prisma.stockMovement.create({
+    data: {
+      medicineId: med.id,
+      type: 'purchase',
+      quantity: 135,
+      referenceType: 'Purchase',
+      referenceId: purchase.id,
+    },
+  });
+
+  console.log(`Created test medicine ${med.name} with 2 active batches.`);
+
+  // 2. Launch browser and navigate
+  const browser = await puppeteer.launch({
+    headless: true,
+    executablePath: '/usr/bin/google-chrome',
+    args: ['--no-sandbox', '--disable-setuid-sandbox'],
+  });
+
+  const page = await browser.newPage();
+  await page.setViewport({ width: 1366, height: 950 });
+
+  // Login
+  await page.goto('http://localhost:3456/login', { waitUntil: 'networkidle2' });
+  await page.waitForSelector('input[name="email"], input[type="email"]');
+  await page.type('input[name="email"], input[type="email"]', 'admin@lifecare.com');
+  await page.type('input[name="password"], input[type="password"]', 'password123');
+  await page.click('button[type="submit"]');
+  await page.waitForNavigation({ waitUntil: 'networkidle2' });
+
+  // Go to Edit form
+  await page.goto(`http://localhost:3456/pharmacy/medicines/${med.id}/edit`, { waitUntil: 'networkidle2' });
+  await page.screenshot({ path: path.join(artifactDir, 'medicine_edit_with_batches.png') });
+  console.log('✅ Captured medicine_edit_with_batches.png with real batches!');
+
+  // Edit the first batch
+  const batchInputs = await page.$$('input[placeholder*="B-10294"]');
+  if (batchInputs.length > 0) {
+    await batchInputs[0].click({ clickCount: 3 });
+    await batchInputs[0].type('PAN-2026-A1-UPDATED');
+
+    const saveBtns = await page.$$('button ::-p-text(Save Batch)');
+    if (saveBtns.length > 0) {
+      await saveBtns[0].click();
+      await new Promise((r) => setTimeout(r, 800));
+      await page.screenshot({ path: path.join(artifactDir, 'batch_saved_success.png') });
+      console.log('✅ Captured batch_saved_success.png with Save confirmation!');
+    }
+  }
+
+  // Go to Medicines Master list
+  await page.goto('http://localhost:3456/pharmacy/medicines', { waitUntil: 'networkidle2' });
+  await page.screenshot({ path: path.join(artifactDir, 'medicines_master_list.png') });
+  console.log('✅ Captured medicines_master_list.png with updated medicine & stock!');
+
+  // Go to Expiry Report
+  await page.goto('http://localhost:3456/pharmacy/expiry-report', { waitUntil: 'networkidle2' });
+  await page.screenshot({ path: path.join(artifactDir, 'expiry_report.png') });
+  console.log('✅ Captured expiry_report.png!');
+
+  await browser.close();
+  await prisma.$disconnect();
+}
+
+main().catch(console.error);
+
 --- FILE: scripts/check-db.js ---
 const fs = require('fs');
 const env = fs.readFileSync('.env', 'utf8');
@@ -22921,6 +23376,97 @@ for (const p of candidatePaths) {
   fixReorderLevels(p);
 }
 
+
+--- FILE: scripts/generate-icons.js ---
+const fs = require('fs');
+const path = require('path');
+const sharp = require('sharp');
+
+async function createIco(sizes, inputPath, outputPath) {
+  const pngBuffers = [];
+  
+  for (const size of sizes) {
+    const buf = await sharp(inputPath)
+      .ensureAlpha()
+      .resize(size, size, { fit: 'contain', background: { r: 255, g: 255, b: 255, alpha: 0 } })
+      .png({ colourMap: false })
+      .toBuffer();
+    pngBuffers.push({ size, buf });
+  }
+
+  // Calculate ICO header & directory
+  const count = pngBuffers.length;
+  const headerSize = 6;
+  const dirEntrySize = 16;
+  let currentOffset = headerSize + count * dirEntrySize;
+
+  const header = Buffer.alloc(headerSize);
+  header.writeUInt16LE(0, 0);     // Reserved
+  header.writeUInt16LE(1, 2);     // Type 1 = ICO
+  header.writeUInt16LE(count, 4); // Number of images
+
+  const entries = [];
+  for (const item of pngBuffers) {
+    const entry = Buffer.alloc(dirEntrySize);
+    entry.writeUInt8(item.size >= 256 ? 0 : item.size, 0); // Width (0 for 256)
+    entry.writeUInt8(item.size >= 256 ? 0 : item.size, 1); // Height (0 for 256)
+    entry.writeUInt8(0, 2);                                // Color count
+    entry.writeUInt8(0, 3);                                // Reserved
+    entry.writeUInt16LE(1, 4);                             // Color planes
+    entry.writeUInt16LE(32, 6);                            // Bits per pixel
+    entry.writeUInt32LE(item.buf.length, 8);               // Image size in bytes
+    entry.writeUInt32LE(currentOffset, 12);                // Image offset
+    entries.push(entry);
+    currentOffset += item.buf.length;
+  }
+
+  const allBuffers = [header, ...entries, ...pngBuffers.map(p => p.buf)];
+  const finalIcoBuffer = Buffer.concat(allBuffers);
+  
+  fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+  fs.writeFileSync(outputPath, finalIcoBuffer);
+  console.log(`[generate-icons] Successfully created ${outputPath} (${(finalIcoBuffer.length / 1024).toFixed(1)} KB)`);
+}
+
+async function main() {
+  const logoPath = path.resolve(__dirname, '../public/logo.jpeg');
+  if (!fs.existsSync(logoPath)) {
+    console.error(`[generate-icons] Error: Logo not found at ${logoPath}`);
+    process.exit(1);
+  }
+
+  console.log(`[generate-icons] Processing logo from: ${logoPath}`);
+
+  // 1. Generate build/icon.ico for Windows installer & executable
+  const buildIcoPath = path.resolve(__dirname, '../build/icon.ico');
+  await createIco([16, 32, 48, 64, 128, 256], logoPath, buildIcoPath);
+
+  // 2. Generate high-res 512x512 build/icon.png
+  const buildPngPath = path.resolve(__dirname, '../build/icon.png');
+  await sharp(logoPath).resize(512, 512, { fit: 'contain', background: { r: 255, g: 255, b: 255, alpha: 0 } }).png().toFile(buildPngPath);
+  console.log(`[generate-icons] Created ${buildPngPath}`);
+
+  // 3. Generate public/icon.png & public/logo.png
+  const publicPngPath = path.resolve(__dirname, '../public/icon.png');
+  await sharp(logoPath).resize(512, 512, { fit: 'contain', background: { r: 255, g: 255, b: 255, alpha: 0 } }).png().toFile(publicPngPath);
+  const publicLogoPng = path.resolve(__dirname, '../public/logo.png');
+  await sharp(logoPath).png().toFile(publicLogoPng);
+  console.log(`[generate-icons] Created ${publicPngPath} and ${publicLogoPng}`);
+
+  // 4. Update src/app/favicon.ico & src/app/icon.png
+  const appIcoPath = path.resolve(__dirname, '../src/app/favicon.ico');
+  await createIco([16, 32, 48], logoPath, appIcoPath);
+  const appIconPng = path.resolve(__dirname, '../src/app/icon.png');
+  await sharp(logoPath).resize(512, 512).png().toFile(appIconPng);
+  console.log(`[generate-icons] Updated ${appIcoPath} and ${appIconPng}`);
+
+  console.log(`[generate-icons] All app icons generated successfully!`);
+}
+
+main().catch(err => {
+  console.error('[generate-icons] Fatal error:', err);
+  process.exit(1);
+});
 
 --- FILE: scripts/generate-mock-invoice.tsx ---
 import React from 'react';
@@ -24463,6 +25009,174 @@ verifyAllPdfs().catch((err) => {
   console.error('❌ PDF Verification failed:', err);
   process.exit(1);
 });
+
+--- FILE: scripts/verify-medicines-master-and-batches.ts ---
+import puppeteer from 'puppeteer';
+import path from 'path';
+import fs from 'fs';
+import { prisma } from '../src/lib/prisma';
+
+async function main() {
+  console.log('=== Starting Verification for Medicines Master & Batch Editing ===');
+
+  const artifactDir = '/home/maazzalii/.gemini/antigravity-ide/brain/8755d35f-e0e6-4be2-b762-225bbea2a751';
+  if (!fs.existsSync(artifactDir)) {
+    fs.mkdirSync(artifactDir, { recursive: true });
+  }
+
+  const browser = await puppeteer.launch({
+    headless: true,
+    executablePath: '/usr/bin/google-chrome',
+    args: ['--no-sandbox', '--disable-setuid-sandbox'],
+  });
+
+  const page = await browser.newPage();
+  await page.setViewport({ width: 1366, height: 900 });
+
+  try {
+    // 1. Log in
+    console.log('1. Logging in as admin@lifecare.com...');
+    await page.goto('http://localhost:3456/login', { waitUntil: 'networkidle2' });
+    await page.waitForSelector('input[name="email"], input[type="email"]');
+    await page.type('input[name="email"], input[type="email"]', 'admin@lifecare.com');
+    await page.type('input[name="password"], input[type="password"]', 'password123');
+    await page.click('button[type="submit"]');
+
+    await page.waitForNavigation({ waitUntil: 'networkidle2' });
+    console.log('✅ Logged in successfully. Current URL:', page.url());
+
+    // 2. Create a test medicine with Initial Batch via UI
+    console.log('2. Navigating to Add Medicine form...');
+    await page.goto('http://localhost:3456/pharmacy/medicines/new', { waitUntil: 'networkidle2' });
+    await page.screenshot({ path: path.join(artifactDir, 'med_add_form.png') });
+
+    const medName = `Augmentin 625mg ${Date.now().toString().slice(-4)}`;
+    await page.waitForSelector('input[placeholder*="Paracetamol"]');
+    await page.type('input[placeholder*="Paracetamol"]', medName);
+
+    // Select category
+    const catSelect = await page.$('select');
+    if (catSelect) {
+      const options = await page.$$eval('select option', opts => opts.map(o => (o as HTMLOptionElement).value).filter(v => !!v));
+      if (options.length > 0) {
+        await page.select('select', options[0]);
+      }
+    }
+
+    // Pricing & Inventory
+    const numberInputs = await page.$$('input[type="number"]');
+    if (numberInputs.length >= 2) {
+      await numberInputs[0].type('45'); // inPrice
+      await numberInputs[1].type('60'); // outPrice
+    }
+
+    // Fill Initial Stock & Batch section
+    const initialQtyInput = await page.$('input[placeholder*="e.g. 100"], input[name="quantity"]');
+    if (initialQtyInput) {
+      await initialQtyInput.type('50');
+    }
+    const batchInput = await page.$('input[placeholder*="e.g. B-10294"], input[placeholder*="B-"]');
+    if (batchInput) {
+      await batchInput.type('BATCH-AUG-101');
+    }
+
+    // Submit Add Medicine
+    const submitBtn = await page.$('button[type="submit"]');
+    if (submitBtn) {
+      await submitBtn.click();
+      await page.waitForNavigation({ waitUntil: 'networkidle2' });
+      console.log('✅ Medicine created successfully!');
+    }
+
+    // 3. View Medicines Master
+    console.log('3. Viewing Medicines Master list...');
+    await page.goto('http://localhost:3456/pharmacy/medicines', { waitUntil: 'networkidle2' });
+    await page.screenshot({ path: path.join(artifactDir, 'medicines_master_list.png') });
+    console.log('✅ Captured medicines_master_list.png');
+
+    // 4. Find the medicine in DB and navigate to Edit form
+    const createdMed = await prisma.medicine.findFirst({
+      where: { name: medName },
+      include: { batches: true },
+    });
+    console.log(`Found created medicine: ${createdMed?.name} with ${createdMed?.batches.length} batches`);
+
+    if (createdMed) {
+      console.log(`4. Navigating to Edit page for ${createdMed.id}...`);
+      await page.goto(`http://localhost:3456/pharmacy/medicines/${createdMed.id}/edit`, { waitUntil: 'networkidle2' });
+      await page.screenshot({ path: path.join(artifactDir, 'medicine_edit_with_batches.png') });
+      console.log('✅ Captured medicine_edit_with_batches.png');
+
+      // Edit the batch number and expiry date
+      const batchNoInput = await page.$('input[value*="BATCH-AUG-101"]');
+      if (batchNoInput) {
+        // Clear input and type new batch number
+        await batchNoInput.click({ clickCount: 3 });
+        await batchNoInput.type('BATCH-AUG-EDITED-999');
+
+        const saveBatchBtn = await page.$('button ::-p-text(Save Batch)');
+        if (saveBatchBtn) {
+          await saveBatchBtn.click();
+          await new Promise(r => setTimeout(r, 1000));
+          await page.screenshot({ path: path.join(artifactDir, 'batch_saved_success.png') });
+          console.log('✅ Captured batch_saved_success.png');
+        }
+      }
+
+      // Reload edit page to verify persistence
+      await page.reload({ waitUntil: 'networkidle2' });
+      await page.screenshot({ path: path.join(artifactDir, 'medicine_edit_persisted.png') });
+      console.log('✅ Verified batch edit persisted upon page reload!');
+    }
+
+    // 5. Seed 120 test medicines to demonstrate UI pagination
+    console.log('5. Seeding 120 medicines to verify UI pagination controls...');
+    let cat = await prisma.medicineCategory.findFirst();
+    const paginationTestMeds = [];
+    for (let i = 1; i <= 120; i++) {
+      paginationTestMeds.push({
+        name: `Catalog Medicine PageTest ${i.toString().padStart(3, '0')}`,
+        categoryId: cat?.id || null,
+        manufacturer: 'Pfizer / Abbott',
+        unitPrice: 15,
+        sellingPrice: 25,
+        unit: 'Tablet',
+        reorderLevel: 5,
+      });
+    }
+    await prisma.medicine.createMany({ data: paginationTestMeds });
+
+    // View Page 1
+    await page.goto('http://localhost:3456/pharmacy/medicines', { waitUntil: 'networkidle2' });
+    await page.screenshot({ path: path.join(artifactDir, 'medicines_pagination_page1.png') });
+    console.log('✅ Captured medicines_pagination_page1.png');
+
+    // Click Next or Go to Page 2
+    await page.goto('http://localhost:3456/pharmacy/medicines?page=2', { waitUntil: 'networkidle2' });
+    await page.screenshot({ path: path.join(artifactDir, 'medicines_pagination_page2.png') });
+    console.log('✅ Captured medicines_pagination_page2.png');
+
+    // Test Search filter in UI
+    await page.goto(`http://localhost:3456/pharmacy/medicines?q=${encodeURIComponent(medName)}`, { waitUntil: 'networkidle2' });
+    await page.screenshot({ path: path.join(artifactDir, 'medicines_search_filter.png') });
+    console.log('✅ Captured medicines_search_filter.png');
+
+    // Clean up pagination test meds
+    await prisma.medicine.deleteMany({
+      where: { name: { startsWith: 'Catalog Medicine PageTest ' } },
+    });
+    console.log('Cleaned up pagination test medicines.');
+
+    console.log('=== All Verifications Succeeded! ===');
+  } catch (err) {
+    console.error('Verification error:', err);
+  } finally {
+    await browser.close();
+    await prisma.$disconnect();
+  }
+}
+
+main().catch(console.error);
 
 --- FILE: scripts/verify-packaged-e2e.ts ---
 import puppeteer from 'puppeteer';

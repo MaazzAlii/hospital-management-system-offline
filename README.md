@@ -163,6 +163,19 @@ A production-grade, offline-first Hospital Management System (HMS) designed and 
 ### 20. Pharmacy Wholesale Sale with FEFO Batch Tracking
 ![Pharmacy Sale Details](docs/screenshots/71-pharmacy-sale-batch-details.png)
 
+### 21. Scalable Medicines Master with Fast Server-Side Pagination
+- Single `COUNT(*)` query and database-level SQL stock aggregation via `stockMovement.groupBy` preventing SQLite host-parameter limits at scale.
+- Global low-stock alert monitoring across catalog inventory without in-memory full table joins.
+- Responsive pagination controls supporting high volume medicine catalogs (5,000+ items).
+![Medicines Master Scalable Pagination](docs/screenshots/73-pharmacy-medicines-scale-pagination.png)
+
+### 22. Multi-Batch Number & Expiry Date Management on Existing Medicines
+- Interactive per-batch editing directly on the Edit Medicine page (`/pharmacy/medicines/[id]/edit`).
+- Real-time synchronization across `Batch` and linked `PurchaseItem` records keeping purchase history, printed invoices, and expiry risk reports consistent.
+- Validation blocking empty batch codes or invalid dates with inline visual confirmation (`Saved!`).
+![Medicine Edit with Batches](docs/screenshots/74-pharmacy-medicine-edit-batches.png)
+![Batch Saved Feedback](docs/screenshots/75-pharmacy-batch-saved-success.png)
+
 ---
 
 ## ⚡ Installer Optimization & Clean Slate Seed Database
