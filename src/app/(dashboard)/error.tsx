@@ -60,12 +60,13 @@ export default function DashboardError({
 
           <Button
             variant="outline"
-            asChild
+            onClick={() => {
+              window.location.href = "/dashboard";
+            }}
+            className="flex items-center gap-2"
           >
-            <Link href="/dashboard" className="flex items-center gap-2">
-              <LayoutDashboard className="w-4 h-4" />
-              Dashboard
-            </Link>
+            <LayoutDashboard className="w-4 h-4" />
+            Dashboard
           </Button>
         </div>
       </div>

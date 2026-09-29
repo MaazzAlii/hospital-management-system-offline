@@ -102,7 +102,7 @@ async function main() {
   // Edit the first batch
   const batchInputs = await page.$$('input[placeholder*="B-10294"]');
   if (batchInputs.length > 0) {
-    await batchInputs[0].click({ clickCount: 3 });
+    await (batchInputs[0] as any).click({ clickCount: 3 });
     await batchInputs[0].type('PAN-2026-A1-UPDATED');
 
     const saveBtns = await page.$$('button ::-p-text(Save Batch)');

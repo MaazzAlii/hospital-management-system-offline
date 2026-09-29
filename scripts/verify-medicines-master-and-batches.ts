@@ -98,7 +98,7 @@ async function main() {
       const batchNoInput = await page.$('input[value*="BATCH-AUG-101"]');
       if (batchNoInput) {
         // Clear input and type new batch number
-        await batchNoInput.click({ clickCount: 3 });
+        await (batchNoInput as any).click({ clickCount: 3 });
         await batchNoInput.type('BATCH-AUG-EDITED-999');
 
         const saveBatchBtn = await page.$('button ::-p-text(Save Batch)');
