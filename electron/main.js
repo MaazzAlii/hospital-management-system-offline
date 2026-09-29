@@ -155,120 +155,125 @@ function ensureDatabaseExists() {
           stdio: 'inherit',
         });
       }
-    } else {
-      try {
-        const Database = require('better-sqlite3');
-        const db = new Database(dbPath);
-
-        // 1. Ensure Batch table exists
-        db.exec(`
-          CREATE TABLE IF NOT EXISTS "Batch" (
-            "id" TEXT NOT NULL PRIMARY KEY,
-            "medicineId" TEXT NOT NULL,
-            "purchaseItemId" TEXT,
-            "batchNo" TEXT NOT NULL,
-            "expiryDate" DATETIME NOT NULL,
-            "quantityReceived" INTEGER NOT NULL,
-            "quantityRemaining" INTEGER NOT NULL,
-            "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            CONSTRAINT "Batch_medicineId_fkey" FOREIGN KEY ("medicineId") REFERENCES "Medicine" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
-            CONSTRAINT "Batch_purchaseItemId_fkey" FOREIGN KEY ("purchaseItemId") REFERENCES "PurchaseItem" ("id") ON DELETE SET NULL ON UPDATE CASCADE
-          );
-          CREATE INDEX IF NOT EXISTS "Batch_medicineId_idx" ON "Batch"("medicineId");
-          CREATE INDEX IF NOT EXISTS "Batch_batchNo_idx" ON "Batch"("batchNo");
-        `);
-
-        // 2. Ensure StockMovement table exists
-        db.exec(`
-          CREATE TABLE IF NOT EXISTS "StockMovement" (
-            "id" TEXT NOT NULL PRIMARY KEY,
-            "medicineId" TEXT NOT NULL,
-            "purchaseItemId" TEXT,
-            "type" TEXT NOT NULL,
-            "quantity" INTEGER NOT NULL,
-            "referenceType" TEXT,
-            "referenceId" TEXT,
-            "notes" TEXT,
-            "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            CONSTRAINT "StockMovement_medicineId_fkey" FOREIGN KEY ("medicineId") REFERENCES "Medicine" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
-            CONSTRAINT "StockMovement_purchaseItemId_fkey" FOREIGN KEY ("purchaseItemId") REFERENCES "PurchaseItem" ("id") ON DELETE SET NULL ON UPDATE CASCADE
-          );
-        `);
-
-        // Helper to safely add missing columns
-        const addColumnIfMissing = (tableName, columnName, columnDef) => {
-          try {
-            const cols = db.prepare(`PRAGMA table_info("${tableName}")`).all();
-            const colSet = new Set(cols.map(c => c.name));
-            if (!colSet.has(columnName)) {
-              db.prepare(`ALTER TABLE "${tableName}" ADD COLUMN ${columnName} ${columnDef}`).run();
-              console.log(`[Electron Migration] Added column ${columnName} to ${tableName}`);
-            }
-          } catch (e) {
-            console.warn(`[Electron Migration] Note adding ${columnName} to ${tableName}:`, e.message);
-          }
-        };
-
-        // 3. Ensure LabTest columns
-        addColumnIfMissing('LabTest', 'turnaroundHours', 'INTEGER');
-        addColumnIfMissing('LabTest', 'isActive', 'BOOLEAN NOT NULL DEFAULT 1');
-
-        // 4. Ensure Sale columns
-        addColumnIfMissing('Sale', 'accountCode', 'TEXT');
-        addColumnIfMissing('Sale', 'customerAddress', 'TEXT');
-        addColumnIfMissing('Sale', 'licenseNo', 'TEXT');
-        addColumnIfMissing('Sale', 'ntn', 'TEXT');
-        addColumnIfMissing('Sale', 'summaryPrsNo', 'TEXT');
-        addColumnIfMissing('Sale', 'bookedBy', 'TEXT');
-        addColumnIfMissing('Sale', 'salesmanMobile', 'TEXT');
-        addColumnIfMissing('Sale', 'suppliedBy', 'TEXT');
-        addColumnIfMissing('Sale', 'territory', 'TEXT');
-
-        // 5. Ensure SaleItem columns
-        addColumnIfMissing('SaleItem', 'batchId', 'TEXT');
-        addColumnIfMissing('SaleItem', 'batchNo', 'TEXT');
-        addColumnIfMissing('SaleItem', 'expiryDate', 'DATETIME');
-        addColumnIfMissing('SaleItem', 'freeQty', 'INTEGER NOT NULL DEFAULT 0');
-        addColumnIfMissing('SaleItem', 'tradePrice', 'REAL');
-        addColumnIfMissing('SaleItem', 'grossAmount', 'REAL');
-        addColumnIfMissing('SaleItem', 'discountPercent', 'REAL DEFAULT 0');
-        addColumnIfMissing('SaleItem', 'discountAmount', 'REAL DEFAULT 0');
-        addColumnIfMissing('SaleItem', 'sTax', 'REAL DEFAULT 0');
-        addColumnIfMissing('SaleItem', 'gst', 'REAL DEFAULT 0');
-        addColumnIfMissing('SaleItem', 'netAmount', 'REAL');
-
-        // 6. Ensure PurchaseItem columns
-        addColumnIfMissing('PurchaseItem', 'batchNo', 'TEXT');
-        addColumnIfMissing('PurchaseItem', 'expiryDate', 'DATETIME');
-
-        // 7. Ensure Settings columns
-        addColumnIfMissing('Settings', 'clinicName', "TEXT NOT NULL DEFAULT 'Life Care Clinic, Nawagai Buner'");
-        addColumnIfMissing('Settings', 'address', "TEXT DEFAULT 'Nawagai, Buner, Khyber Pakhtunkhwa'");
-        addColumnIfMissing('Settings', 'phone', "TEXT DEFAULT '03439626941'");
-        addColumnIfMissing('Settings', 'email', "TEXT DEFAULT 'shakeelbuneri933@gmail.com'");
-
-        // 8. Fix erroneous default reorder levels (100 -> 4)
-        try {
-          const reorderFix = db.prepare('UPDATE "Medicine" SET "reorderLevel" = 4 WHERE "reorderLevel" = 100').run();
-          if (reorderFix.changes > 0) {
-            console.log(`[Electron Migration] Updated ${reorderFix.changes} medicines from reorderLevel=100 to 4.`);
-          }
-        } catch (e) {
-          console.warn('[Electron Migration] Note updating medicine reorder levels:', e.message);
-        }
-
-        db.close();
-        console.log('[Electron] DB schema auto-migration check completed successfully.');
-      } catch (migrateErr) {
-        console.warn('[Electron] DB schema migration check warning:', migrateErr);
-      }
     }
+
+    // Run schema repairs on EVERY launch (whether the database was freshly copied or already existed)
+    runSchemaRepairs();
   } catch (err) {
     console.error('[Electron] Database initialization error:', err);
     const msg = `[Database Init Error] ${err.stack || err}\n`;
     appendCapturedLog(msg);
     try { fs.appendFileSync(path.join(userDataPath, 'server-error.log'), msg); } catch (e) {}
+  }
+}
+
+function runSchemaRepairs() {
+  try {
+    const Database = require('better-sqlite3');
+    const db = new Database(dbPath);
+
+    // 1. Ensure Batch table exists
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS "Batch" (
+        "id" TEXT NOT NULL PRIMARY KEY,
+        "medicineId" TEXT NOT NULL,
+        "purchaseItemId" TEXT,
+        "batchNo" TEXT NOT NULL,
+        "expiryDate" DATETIME NOT NULL,
+        "quantityReceived" INTEGER NOT NULL,
+        "quantityRemaining" INTEGER NOT NULL,
+        "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT "Batch_medicineId_fkey" FOREIGN KEY ("medicineId") REFERENCES "Medicine" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+        CONSTRAINT "Batch_purchaseItemId_fkey" FOREIGN KEY ("purchaseItemId") REFERENCES "PurchaseItem" ("id") ON DELETE SET NULL ON UPDATE CASCADE
+      );
+      CREATE INDEX IF NOT EXISTS "Batch_medicineId_idx" ON "Batch"("medicineId");
+      CREATE INDEX IF NOT EXISTS "Batch_batchNo_idx" ON "Batch"("batchNo");
+    `);
+
+    // 2. Ensure StockMovement table exists
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS "StockMovement" (
+        "id" TEXT NOT NULL PRIMARY KEY,
+        "medicineId" TEXT NOT NULL,
+        "purchaseItemId" TEXT,
+        "type" TEXT NOT NULL,
+        "quantity" INTEGER NOT NULL,
+        "referenceType" TEXT,
+        "referenceId" TEXT,
+        "notes" TEXT,
+        "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT "StockMovement_medicineId_fkey" FOREIGN KEY ("medicineId") REFERENCES "Medicine" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+        CONSTRAINT "StockMovement_purchaseItemId_fkey" FOREIGN KEY ("purchaseItemId") REFERENCES "PurchaseItem" ("id") ON DELETE SET NULL ON UPDATE CASCADE
+      );
+    `);
+
+    // Helper to safely add missing columns
+    const addColumnIfMissing = (tableName, columnName, columnDef) => {
+      try {
+        const cols = db.prepare(`PRAGMA table_info("${tableName}")`).all();
+        const colSet = new Set(cols.map(c => c.name));
+        if (!colSet.has(columnName)) {
+          db.prepare(`ALTER TABLE "${tableName}" ADD COLUMN ${columnName} ${columnDef}`).run();
+          console.log(`[Electron Migration] Added column ${columnName} to ${tableName}`);
+        }
+      } catch (e) {
+        console.warn(`[Electron Migration] Note adding ${columnName} to ${tableName}:`, e.message);
+      }
+    };
+
+    // 3. Ensure LabTest columns
+    addColumnIfMissing('LabTest', 'turnaroundHours', 'INTEGER');
+    addColumnIfMissing('LabTest', 'isActive', 'BOOLEAN NOT NULL DEFAULT 1');
+
+    // 4. Ensure Sale columns
+    addColumnIfMissing('Sale', 'accountCode', 'TEXT');
+    addColumnIfMissing('Sale', 'customerAddress', 'TEXT');
+    addColumnIfMissing('Sale', 'licenseNo', 'TEXT');
+    addColumnIfMissing('Sale', 'ntn', 'TEXT');
+    addColumnIfMissing('Sale', 'summaryPrsNo', 'TEXT');
+    addColumnIfMissing('Sale', 'bookedBy', 'TEXT');
+    addColumnIfMissing('Sale', 'salesmanMobile', 'TEXT');
+    addColumnIfMissing('Sale', 'suppliedBy', 'TEXT');
+    addColumnIfMissing('Sale', 'territory', 'TEXT');
+
+    // 5. Ensure SaleItem columns
+    addColumnIfMissing('SaleItem', 'batchId', 'TEXT');
+    addColumnIfMissing('SaleItem', 'batchNo', 'TEXT');
+    addColumnIfMissing('SaleItem', 'expiryDate', 'DATETIME');
+    addColumnIfMissing('SaleItem', 'freeQty', 'INTEGER NOT NULL DEFAULT 0');
+    addColumnIfMissing('SaleItem', 'tradePrice', 'REAL');
+    addColumnIfMissing('SaleItem', 'grossAmount', 'REAL');
+    addColumnIfMissing('SaleItem', 'discountPercent', 'REAL DEFAULT 0');
+    addColumnIfMissing('SaleItem', 'discountAmount', 'REAL DEFAULT 0');
+    addColumnIfMissing('SaleItem', 'sTax', 'REAL DEFAULT 0');
+    addColumnIfMissing('SaleItem', 'gst', 'REAL DEFAULT 0');
+    addColumnIfMissing('SaleItem', 'netAmount', 'REAL');
+
+    // 6. Ensure PurchaseItem columns
+    addColumnIfMissing('PurchaseItem', 'batchNo', 'TEXT');
+    addColumnIfMissing('PurchaseItem', 'expiryDate', 'DATETIME');
+
+    // 7. Ensure Settings columns
+    addColumnIfMissing('Settings', 'clinicName', "TEXT NOT NULL DEFAULT 'Life Care Clinic, Nawagai Buner'");
+    addColumnIfMissing('Settings', 'address', "TEXT DEFAULT 'Nawagai, Buner, Khyber Pakhtunkhwa'");
+    addColumnIfMissing('Settings', 'phone', "TEXT DEFAULT '03439626941'");
+    addColumnIfMissing('Settings', 'email', "TEXT DEFAULT 'shakeelbuneri933@gmail.com'");
+
+    // 8. Fix erroneous default reorder levels (100 -> 4)
+    try {
+      const reorderFix = db.prepare('UPDATE "Medicine" SET "reorderLevel" = 4 WHERE "reorderLevel" = 100').run();
+      if (reorderFix.changes > 0) {
+        console.log(`[Electron Migration] Updated ${reorderFix.changes} medicines from reorderLevel=100 to 4.`);
+      }
+    } catch (e) {
+      console.warn('[Electron Migration] Note updating medicine reorder levels:', e.message);
+    }
+
+    db.close();
+    console.log('[Electron] DB schema auto-migration check completed successfully.');
+  } catch (migrateErr) {
+    console.warn('[Electron] DB schema migration check warning:', migrateErr);
   }
 }
 

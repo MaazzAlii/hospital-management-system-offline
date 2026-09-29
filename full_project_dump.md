@@ -1,11 +1,3 @@
-# LifeCare Clinic HMS - Full Project Codebase Dump
-
-This structured document aggregates 100% of raw code, configurations, database definitions, actions, and platform scripts across the entire LifeCare Clinic HMS project for architectural review, deep debugging, and cross-file dependency verification.
-
-================================================================================
-# LEVEL 1: ROOT CONFIGURATION AND DEPENDENCY FILES
-================================================================================
-
 --- FILE: package.json ---
 {
   "name": "hms",
@@ -736,9 +728,476 @@ model ReferenceRange {
 }
 
 
-================================================================================
-# LEVEL 2: MAIN ENTRY POINT / INITIALIZATION FILES
-================================================================================
+--- FILE: prisma/migrations/20260802085518_init/migration.sql ---
+-- CreateTable
+CREATE TABLE "Counter" (
+    "name" TEXT NOT NULL PRIMARY KEY,
+    "value" INTEGER NOT NULL DEFAULT 0
+);
+
+-- CreateTable
+CREATE TABLE "Role" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "name" TEXT NOT NULL,
+    "description" TEXT,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL
+);
+
+-- CreateTable
+CREATE TABLE "Permission" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "module" TEXT NOT NULL,
+    "action" TEXT NOT NULL,
+    "description" TEXT,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL
+);
+
+-- CreateTable
+CREATE TABLE "RolePermission" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "roleId" TEXT NOT NULL,
+    "permissionId" TEXT NOT NULL,
+    CONSTRAINT "RolePermission_roleId_fkey" FOREIGN KEY ("roleId") REFERENCES "Role" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT "RolePermission_permissionId_fkey" FOREIGN KEY ("permissionId") REFERENCES "Permission" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "User" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "email" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "passwordHash" TEXT,
+    "roleId" TEXT,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL,
+    CONSTRAINT "User_roleId_fkey" FOREIGN KEY ("roleId") REFERENCES "Role" ("id") ON DELETE SET NULL ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "Branch" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "name" TEXT NOT NULL,
+    "address" TEXT,
+    "phone" TEXT,
+    "isMain" BOOLEAN NOT NULL DEFAULT false,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL
+);
+
+-- CreateTable
+CREATE TABLE "Patient" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "mrn" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "phone" TEXT,
+    "email" TEXT,
+    "dob" TEXT,
+    "gender" TEXT,
+    "address" TEXT,
+    "bloodGroup" TEXT,
+    "emergencyContact" TEXT,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL
+);
+
+-- CreateTable
+CREATE TABLE "Doctor" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "userId" TEXT NOT NULL,
+    "specialization" TEXT,
+    "qualification" TEXT,
+    "fee" REAL NOT NULL DEFAULT 0,
+    "phone" TEXT,
+    "status" TEXT NOT NULL DEFAULT 'active',
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL,
+    CONSTRAINT "Doctor_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "DoctorSchedule" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "doctorId" TEXT NOT NULL,
+    "dayOfWeek" TEXT NOT NULL,
+    "startTime" TEXT NOT NULL,
+    "endTime" TEXT NOT NULL,
+    "slotDuration" INTEGER NOT NULL DEFAULT 15,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL,
+    CONSTRAINT "DoctorSchedule_doctorId_fkey" FOREIGN KEY ("doctorId") REFERENCES "Doctor" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "Appointment" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "patientId" TEXT NOT NULL,
+    "doctorId" TEXT NOT NULL,
+    "scheduledAt" DATETIME NOT NULL,
+    "status" TEXT NOT NULL DEFAULT 'scheduled',
+    "reason" TEXT,
+    "notes" TEXT,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL,
+    CONSTRAINT "Appointment_patientId_fkey" FOREIGN KEY ("patientId") REFERENCES "Patient" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT "Appointment_doctorId_fkey" FOREIGN KEY ("doctorId") REFERENCES "Doctor" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "OpdVisit" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "patientId" TEXT NOT NULL,
+    "doctorId" TEXT NOT NULL,
+    "appointmentId" TEXT,
+    "visitDate" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "vitals" JSONB,
+    "symptoms" TEXT,
+    "diagnosis" TEXT,
+    "prescription" JSONB,
+    "notes" TEXT,
+    "status" TEXT NOT NULL DEFAULT 'open',
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL,
+    CONSTRAINT "OpdVisit_patientId_fkey" FOREIGN KEY ("patientId") REFERENCES "Patient" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT "OpdVisit_doctorId_fkey" FOREIGN KEY ("doctorId") REFERENCES "Doctor" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT "OpdVisit_appointmentId_fkey" FOREIGN KEY ("appointmentId") REFERENCES "Appointment" ("id") ON DELETE SET NULL ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "Invoice" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "invoiceNo" TEXT NOT NULL,
+    "patientId" TEXT,
+    "sourceType" TEXT,
+    "sourceId" TEXT,
+    "subtotal" REAL NOT NULL DEFAULT 0,
+    "discountAmt" REAL NOT NULL DEFAULT 0,
+    "discountType" TEXT,
+    "discountValue" REAL,
+    "taxAmt" REAL NOT NULL DEFAULT 0,
+    "total" REAL NOT NULL DEFAULT 0,
+    "paidAmt" REAL NOT NULL DEFAULT 0,
+    "dueAmt" REAL NOT NULL DEFAULT 0,
+    "status" TEXT NOT NULL DEFAULT 'unpaid',
+    "notes" TEXT,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL,
+    CONSTRAINT "Invoice_patientId_fkey" FOREIGN KEY ("patientId") REFERENCES "Patient" ("id") ON DELETE SET NULL ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "InvoiceItem" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "invoiceId" TEXT NOT NULL,
+    "description" TEXT NOT NULL,
+    "quantity" INTEGER NOT NULL DEFAULT 1,
+    "unitPrice" REAL NOT NULL DEFAULT 0,
+    "amount" REAL NOT NULL DEFAULT 0,
+    "itemType" TEXT,
+    "itemId" TEXT,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "InvoiceItem_invoiceId_fkey" FOREIGN KEY ("invoiceId") REFERENCES "Invoice" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "Payment" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "invoiceId" TEXT NOT NULL,
+    "amount" REAL NOT NULL,
+    "paymentMethod" TEXT NOT NULL,
+    "transactionRef" TEXT,
+    "notes" TEXT,
+    "paidAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "Payment_invoiceId_fkey" FOREIGN KEY ("invoiceId") REFERENCES "Invoice" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "Settings" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "clinicName" TEXT NOT NULL DEFAULT 'Life Care Clinic',
+    "address" TEXT,
+    "phone" TEXT,
+    "email" TEXT,
+    "logoUrl" TEXT,
+    "taxRate" REAL NOT NULL DEFAULT 0,
+    "currency" TEXT NOT NULL DEFAULT 'PKR',
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL
+);
+
+-- CreateTable
+CREATE TABLE "AuditLog" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "userId" TEXT,
+    "action" TEXT NOT NULL,
+    "module" TEXT NOT NULL,
+    "details" JSONB,
+    "ipAddress" TEXT,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- CreateTable
+CREATE TABLE "Notification" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "userId" TEXT,
+    "title" TEXT NOT NULL,
+    "message" TEXT NOT NULL,
+    "type" TEXT NOT NULL DEFAULT 'info',
+    "isRead" BOOLEAN NOT NULL DEFAULT false,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- CreateTable
+CREATE TABLE "MedicineCategory" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "name" TEXT NOT NULL,
+    "description" TEXT,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL
+);
+
+-- CreateTable
+CREATE TABLE "Medicine" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "name" TEXT NOT NULL,
+    "genericName" TEXT,
+    "categoryId" TEXT,
+    "manufacturer" TEXT,
+    "unitPrice" REAL NOT NULL DEFAULT 0,
+    "sellingPrice" REAL NOT NULL DEFAULT 0,
+    "reorderLevel" INTEGER NOT NULL DEFAULT 10,
+    "unit" TEXT,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL,
+    CONSTRAINT "Medicine_categoryId_fkey" FOREIGN KEY ("categoryId") REFERENCES "MedicineCategory" ("id") ON DELETE SET NULL ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "Supplier" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "name" TEXT NOT NULL,
+    "contactPerson" TEXT,
+    "phone" TEXT,
+    "email" TEXT,
+    "address" TEXT,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL
+);
+
+-- CreateTable
+CREATE TABLE "Purchase" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "purchaseNo" TEXT NOT NULL,
+    "supplierId" TEXT,
+    "totalAmount" REAL NOT NULL DEFAULT 0,
+    "status" TEXT NOT NULL DEFAULT 'completed',
+    "notes" TEXT,
+    "purchaseDate" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL,
+    CONSTRAINT "Purchase_supplierId_fkey" FOREIGN KEY ("supplierId") REFERENCES "Supplier" ("id") ON DELETE SET NULL ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "PurchaseItem" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "purchaseId" TEXT NOT NULL,
+    "medicineId" TEXT NOT NULL,
+    "batchNo" TEXT,
+    "expiryDate" DATETIME,
+    "quantity" INTEGER NOT NULL,
+    "unitPrice" REAL NOT NULL,
+    "totalPrice" REAL NOT NULL,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "PurchaseItem_purchaseId_fkey" FOREIGN KEY ("purchaseId") REFERENCES "Purchase" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT "PurchaseItem_medicineId_fkey" FOREIGN KEY ("medicineId") REFERENCES "Medicine" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "StockMovement" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "medicineId" TEXT NOT NULL,
+    "purchaseItemId" TEXT,
+    "type" TEXT NOT NULL,
+    "quantity" INTEGER NOT NULL,
+    "referenceType" TEXT,
+    "referenceId" TEXT,
+    "notes" TEXT,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "StockMovement_medicineId_fkey" FOREIGN KEY ("medicineId") REFERENCES "Medicine" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT "StockMovement_purchaseItemId_fkey" FOREIGN KEY ("purchaseItemId") REFERENCES "PurchaseItem" ("id") ON DELETE SET NULL ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "Sale" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "saleNo" TEXT NOT NULL,
+    "patientId" TEXT,
+    "customerName" TEXT,
+    "customerPhone" TEXT,
+    "totalAmount" REAL NOT NULL DEFAULT 0,
+    "status" TEXT NOT NULL DEFAULT 'completed',
+    "saleDate" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL,
+    CONSTRAINT "Sale_patientId_fkey" FOREIGN KEY ("patientId") REFERENCES "Patient" ("id") ON DELETE SET NULL ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "SaleItem" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "saleId" TEXT NOT NULL,
+    "medicineId" TEXT NOT NULL,
+    "batchNo" TEXT,
+    "quantity" INTEGER NOT NULL,
+    "unitPrice" REAL NOT NULL,
+    "totalPrice" REAL NOT NULL,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "SaleItem_saleId_fkey" FOREIGN KEY ("saleId") REFERENCES "Sale" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT "SaleItem_medicineId_fkey" FOREIGN KEY ("medicineId") REFERENCES "Medicine" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "LabCategory" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "name" TEXT NOT NULL,
+    "description" TEXT,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL
+);
+
+-- CreateTable
+CREATE TABLE "LabTest" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "code" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "categoryId" TEXT,
+    "price" REAL NOT NULL DEFAULT 0,
+    "sampleType" TEXT,
+    "description" TEXT,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL,
+    CONSTRAINT "LabTest_categoryId_fkey" FOREIGN KEY ("categoryId") REFERENCES "LabCategory" ("id") ON DELETE SET NULL ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "LabOrder" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "orderNo" TEXT NOT NULL,
+    "patientId" TEXT NOT NULL,
+    "doctorId" TEXT,
+    "totalAmount" REAL NOT NULL DEFAULT 0,
+    "status" TEXT NOT NULL DEFAULT 'pending',
+    "notes" TEXT,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL,
+    CONSTRAINT "LabOrder_patientId_fkey" FOREIGN KEY ("patientId") REFERENCES "Patient" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT "LabOrder_doctorId_fkey" FOREIGN KEY ("doctorId") REFERENCES "Doctor" ("id") ON DELETE SET NULL ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "LabOrderItem" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "labOrderId" TEXT NOT NULL,
+    "testId" TEXT NOT NULL,
+    "price" REAL NOT NULL DEFAULT 0,
+    "status" TEXT NOT NULL DEFAULT 'pending',
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "LabOrderItem_labOrderId_fkey" FOREIGN KEY ("labOrderId") REFERENCES "LabOrder" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT "LabOrderItem_testId_fkey" FOREIGN KEY ("testId") REFERENCES "LabTest" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "Sample" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "sampleNo" TEXT NOT NULL,
+    "labOrderId" TEXT NOT NULL,
+    "sampleType" TEXT NOT NULL,
+    "collectedAt" DATETIME,
+    "status" TEXT NOT NULL DEFAULT 'collected',
+    "notes" TEXT,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "Sample_labOrderId_fkey" FOREIGN KEY ("labOrderId") REFERENCES "LabOrder" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "LabResult" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "labOrderId" TEXT NOT NULL,
+    "testId" TEXT NOT NULL,
+    "parameterName" TEXT NOT NULL,
+    "resultValue" TEXT NOT NULL,
+    "unit" TEXT,
+    "referenceRange" TEXT,
+    "status" TEXT NOT NULL DEFAULT 'final',
+    "notes" TEXT,
+    "testedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL,
+    CONSTRAINT "LabResult_labOrderId_fkey" FOREIGN KEY ("labOrderId") REFERENCES "LabOrder" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT "LabResult_testId_fkey" FOREIGN KEY ("testId") REFERENCES "LabTest" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "ReferenceRange" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "testId" TEXT NOT NULL,
+    "parameterName" TEXT NOT NULL,
+    "gender" TEXT,
+    "ageMin" INTEGER,
+    "ageMax" INTEGER,
+    "lowerLimit" TEXT,
+    "upperLimit" TEXT,
+    "unit" TEXT,
+    "textRange" TEXT,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "ReferenceRange_testId_fkey" FOREIGN KEY ("testId") REFERENCES "LabTest" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Role_name_key" ON "Role"("name");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "RolePermission_roleId_permissionId_key" ON "RolePermission"("roleId", "permissionId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "User_email_key" ON "User"("email");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Patient_mrn_key" ON "Patient"("mrn");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Doctor_userId_key" ON "Doctor"("userId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Invoice_invoiceNo_key" ON "Invoice"("invoiceNo");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "MedicineCategory_name_key" ON "MedicineCategory"("name");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Purchase_purchaseNo_key" ON "Purchase"("purchaseNo");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Sale_saleNo_key" ON "Sale"("saleNo");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "LabCategory_name_key" ON "LabCategory"("name");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "LabTest_code_key" ON "LabTest"("code");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "LabOrder_orderNo_key" ON "LabOrder"("orderNo");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Sample_sampleNo_key" ON "Sample"("sampleNo");
+
+--- FILE: prisma/migrations/migration_lock.toml ---
+# Please do not edit this file manually
+# It should be added in your version-control system (e.g., Git)
+provider = "sqlite"
 
 --- FILE: src/app/layout.tsx ---
 import type { Metadata } from "next";
@@ -1565,61 +2024,6 @@ app.on('before-quit', () => {
 });
 
 
-================================================================================
-# LEVEL 3: CORE SERVICES, API HANDLERS, AND BACKEND LOGIC
-================================================================================
-
---- FILE: src/lib/prisma.ts ---
-import { PrismaClient } from '@/generated/prisma';
-import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3';
-
-const globalForPrisma = globalThis as unknown as {
-  prisma: PrismaClient | undefined;
-};
-
-function createPrismaClient() {
-  const rawUrl = process.env.DATABASE_URL || 'file:./hms.db';
-  const adapter = new PrismaBetterSqlite3({ url: rawUrl });
-  return new PrismaClient({ adapter });
-}
-
-export const prisma = globalForPrisma.prisma ?? createPrismaClient();
-
-if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
-
---- FILE: src/lib/session.ts ---
-import { getIronSession, SessionOptions } from 'iron-session';
-import { cookies } from 'next/headers';
-
-export interface SessionData {
-  userId?: string;
-  email?: string;
-  name?: string;
-  role?: string;
-  permissions?: string[];
-  isLoggedIn: boolean;
-}
-
-export const sessionOptions: SessionOptions = {
-  password: process.env.SESSION_SECRET || 'life_care_clinic_hms_secure_session_secret_32_chars_min',
-  cookieName: 'hms_session',
-  cookieOptions: {
-    secure: false,
-    httpOnly: true,
-    sameSite: 'lax',
-    path: '/',
-  },
-};
-
-export async function getSession() {
-  const cookieStore = await cookies();
-  const session = await getIronSession<SessionData>(cookieStore, sessionOptions);
-  if (session.isLoggedIn === undefined) {
-    session.isLoggedIn = false;
-  }
-  return session;
-}
-
 --- FILE: src/lib/auth-utils.ts ---
 import { getSession } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
@@ -1676,96 +2080,105 @@ export async function getCurrentDoctorId(): Promise<string | null> {
   return doctor ? doctor.id : null;
 }
 
---- FILE: src/lib/permissions.ts ---
+--- FILE: src/lib/client-pdf.ts ---
 /**
- * Checks if a role has access to a specific module or action.
- * Modules: 'dashboard', 'patients', 'doctors', 'appointments', 'opd', 'pharmacy', 'lab', 'billing', 'settings'
- * Actions: 'read', 'write', 'delete', 'apply_discount', 'verify_lab'
+ * Shared PDF fetch, download, and print utility using Fetch + Blob.
+ * Executes in the existing authenticated window context so session cookies
+ * are sent automatically and robustly across both Web and Electron desktop environments.
  */
-export function hasAccess(role: string | null, module: string, action: string = 'read'): boolean {
-  if (!role) return true;
-  
-  // Normalize role string to handle different cases and spacing (e.g., 'Super Admin', 'super_admin', 'superadmin')
-  const normalizedRole = role.toLowerCase().replace(/_/g, ' ').trim();
 
-  // Admin / Super Admin bypass: full access to everything unconditionally
-  if (normalizedRole === 'admin' || normalizedRole === 'super admin' || normalizedRole === 'superadmin') return true;
+export async function downloadPdfFile(url: string, filename: string): Promise<void> {
+  try {
+    const res = await fetch(url, {
+      method: "GET",
+      credentials: "same-origin",
+    });
 
-  if (normalizedRole === 'hospital admin' || role === 'Hospital Admin') {
-    if (module === 'audit' && action === 'delete') return false;
-    return true;
-  }
-
-  if (normalizedRole === 'receptionist') {
-    if (action === 'delete') return false;
-    if (action === 'apply_discount') return false;
-    
-    if (module === 'patients' || module === 'appointments') return true; // full access (except delete)
-    if (module === 'dashboard') return true;
-    
-    // Read-only on Doctors/Billing
-    if (module === 'doctors' || module === 'billing') {
-      return action === 'read';
-    }
-    
-    // NO access to Pharmacy, Lab, Settings
-    return false;
-  }
-
-  if (normalizedRole === 'doctor') {
-    if (module === 'dashboard') return true;
-    
-    // Access to appointments/opd/lab orders (row-level 'own data' restriction enforced in action handlers)
-    if (module === 'appointments' || module === 'opd' || module === 'lab') {
-      return true; // We allow access to module, but restrict to 'own' at data level
+    if (!res.ok) {
+      let errorDetail = "";
+      try {
+        errorDetail = await res.text();
+      } catch {
+        // ignore
+      }
+      const msg = `Failed to download PDF (${res.status} ${res.statusText})${
+        errorDetail ? `: ${errorDetail}` : ""
+      }`;
+      throw new Error(msg);
     }
 
-    if (module === 'patients') return true;
+    const blob = await res.blob();
+    const blobUrl = window.URL.createObjectURL(blob);
 
-    // NO access to Billing, Pharmacy, Settings
-    return false;
+    const a = document.createElement("a");
+    a.style.display = "none";
+    a.href = blobUrl;
+    a.download = filename.endsWith(".pdf") ? filename : `${filename}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+
+    // Cleanup after download trigger
+    setTimeout(() => {
+      window.URL.revokeObjectURL(blobUrl);
+    }, 1000);
+  } catch (error) {
+    console.error("[client-pdf] Error downloading PDF:", error);
+    throw error;
   }
+}
 
-  if (normalizedRole === 'lab technician' || normalizedRole === 'labtechnician') {
-    if (module === 'dashboard') return true;
-    if (action === 'verify_lab') return false;
-    if (action === 'delete') return false;
+export async function printPdfDirect(url: string): Promise<void> {
+  try {
+    const res = await fetch(url, {
+      method: "GET",
+      credentials: "same-origin",
+    });
 
-    if (module === 'lab') return true;
-    
-    return false;
+    if (!res.ok) {
+      let errorDetail = "";
+      try {
+        errorDetail = await res.text();
+      } catch {
+        // ignore
+      }
+      const msg = `Failed to fetch PDF for printing (${res.status} ${res.statusText})${
+        errorDetail ? `: ${errorDetail}` : ""
+      }`;
+      throw new Error(msg);
+    }
+
+    const blob = await res.blob();
+    const blobUrl = window.URL.createObjectURL(blob);
+
+    const iframe = document.createElement("iframe");
+    iframe.style.position = "fixed";
+    iframe.style.right = "0";
+    iframe.style.bottom = "0";
+    iframe.style.width = "0";
+    iframe.style.height = "0";
+    iframe.style.border = "0";
+    iframe.src = blobUrl;
+
+    iframe.onload = () => {
+      setTimeout(() => {
+        iframe.focus();
+        iframe.contentWindow?.print();
+        // Cleanup after print dialog closes
+        setTimeout(() => {
+          if (document.body.contains(iframe)) {
+            document.body.removeChild(iframe);
+          }
+          window.URL.revokeObjectURL(blobUrl);
+        }, 1000);
+      }, 300);
+    };
+
+    document.body.appendChild(iframe);
+  } catch (error) {
+    console.error("[client-pdf] Error printing PDF:", error);
+    throw error;
   }
-
-  if (normalizedRole === 'pathologist') {
-    if (module === 'dashboard') return true;
-    if (module === 'lab') return true;
-    
-    // NO access to Billing, Pharmacy, Patients
-    return false;
-  }
-
-  if (normalizedRole === 'pharmacist') {
-    if (module === 'dashboard') return true;
-    if (module === 'pharmacy') return true;
-
-    // NO access to Patients, Doctors, Appointments, Lab
-    return false;
-  }
-
-  if (normalizedRole === 'cashier') {
-    if (module === 'dashboard') return true;
-    if (action === 'delete') return false;
-
-    if (module === 'billing') return true;
-    
-    // Read-only for patients for billing
-    if (module === 'patients' && action === 'read') return true;
-
-    // NO access to Pharmacy, Lab
-    return false;
-  }
-
-  return false;
 }
 
 --- FILE: src/lib/error-utils.ts ---
@@ -1962,6 +2375,149 @@ export function logPdfError(context: string, error: any): void {
       // Ignore file append errors
     }
   }
+}
+
+--- FILE: src/lib/permissions.ts ---
+/**
+ * Checks if a role has access to a specific module or action.
+ * Modules: 'dashboard', 'patients', 'doctors', 'appointments', 'opd', 'pharmacy', 'lab', 'billing', 'settings'
+ * Actions: 'read', 'write', 'delete', 'apply_discount', 'verify_lab'
+ */
+export function hasAccess(role: string | null, module: string, action: string = 'read'): boolean {
+  if (!role) return true;
+  
+  // Normalize role string to handle different cases and spacing (e.g., 'Super Admin', 'super_admin', 'superadmin')
+  const normalizedRole = role.toLowerCase().replace(/_/g, ' ').trim();
+
+  // Admin / Super Admin bypass: full access to everything unconditionally
+  if (normalizedRole === 'admin' || normalizedRole === 'super admin' || normalizedRole === 'superadmin') return true;
+
+  if (normalizedRole === 'hospital admin' || role === 'Hospital Admin') {
+    if (module === 'audit' && action === 'delete') return false;
+    return true;
+  }
+
+  if (normalizedRole === 'receptionist') {
+    if (action === 'delete') return false;
+    if (action === 'apply_discount') return false;
+    
+    if (module === 'patients' || module === 'appointments') return true; // full access (except delete)
+    if (module === 'dashboard') return true;
+    
+    // Read-only on Doctors/Billing
+    if (module === 'doctors' || module === 'billing') {
+      return action === 'read';
+    }
+    
+    // NO access to Pharmacy, Lab, Settings
+    return false;
+  }
+
+  if (normalizedRole === 'doctor') {
+    if (module === 'dashboard') return true;
+    
+    // Access to appointments/opd/lab orders (row-level 'own data' restriction enforced in action handlers)
+    if (module === 'appointments' || module === 'opd' || module === 'lab') {
+      return true; // We allow access to module, but restrict to 'own' at data level
+    }
+
+    if (module === 'patients') return true;
+
+    // NO access to Billing, Pharmacy, Settings
+    return false;
+  }
+
+  if (normalizedRole === 'lab technician' || normalizedRole === 'labtechnician') {
+    if (module === 'dashboard') return true;
+    if (action === 'verify_lab') return false;
+    if (action === 'delete') return false;
+
+    if (module === 'lab') return true;
+    
+    return false;
+  }
+
+  if (normalizedRole === 'pathologist') {
+    if (module === 'dashboard') return true;
+    if (module === 'lab') return true;
+    
+    // NO access to Billing, Pharmacy, Patients
+    return false;
+  }
+
+  if (normalizedRole === 'pharmacist') {
+    if (module === 'dashboard') return true;
+    if (module === 'pharmacy') return true;
+
+    // NO access to Patients, Doctors, Appointments, Lab
+    return false;
+  }
+
+  if (normalizedRole === 'cashier') {
+    if (module === 'dashboard') return true;
+    if (action === 'delete') return false;
+
+    if (module === 'billing') return true;
+    
+    // Read-only for patients for billing
+    if (module === 'patients' && action === 'read') return true;
+
+    // NO access to Pharmacy, Lab
+    return false;
+  }
+
+  return false;
+}
+
+--- FILE: src/lib/prisma.ts ---
+import { PrismaClient } from '@/generated/prisma';
+import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3';
+
+const globalForPrisma = globalThis as unknown as {
+  prisma: PrismaClient | undefined;
+};
+
+function createPrismaClient() {
+  const rawUrl = process.env.DATABASE_URL || 'file:./hms.db';
+  const adapter = new PrismaBetterSqlite3({ url: rawUrl });
+  return new PrismaClient({ adapter });
+}
+
+export const prisma = globalForPrisma.prisma ?? createPrismaClient();
+
+if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
+
+--- FILE: src/lib/session.ts ---
+import { getIronSession, SessionOptions } from 'iron-session';
+import { cookies } from 'next/headers';
+
+export interface SessionData {
+  userId?: string;
+  email?: string;
+  name?: string;
+  role?: string;
+  permissions?: string[];
+  isLoggedIn: boolean;
+}
+
+export const sessionOptions: SessionOptions = {
+  password: process.env.SESSION_SECRET || 'life_care_clinic_hms_secure_session_secret_32_chars_min',
+  cookieName: 'hms_session',
+  cookieOptions: {
+    secure: false,
+    httpOnly: true,
+    sameSite: 'lax',
+    path: '/',
+  },
+};
+
+export async function getSession() {
+  const cookieStore = await cookies();
+  const session = await getIronSession<SessionData>(cookieStore, sessionOptions);
+  if (session.isLoggedIn === undefined) {
+    session.isLoggedIn = false;
+  }
+  return session;
 }
 
 --- FILE: src/lib/types/database.ts ---
@@ -2200,160 +2756,6 @@ export function formatDisplayDateTime(
   const d = new Date(date);
   if (isNaN(d.getTime())) return fallback;
   return d.toLocaleString("en-PK", options);
-}
-
---- FILE: src/app/actions/auth.ts ---
-"use server";
-
-import { compare, hash } from "bcrypt";
-import { redirect } from "next/navigation";
-import { revalidatePath } from "next/cache";
-import { getSession } from "@/lib/session";
-import { prisma } from "@/lib/prisma";
-
-export async function login(prevState: any, formData?: FormData) {
-  // Support both (formData) and (prevState, formData) signatures
-  let email = "";
-  let password = "";
-
-  if (formData instanceof FormData) {
-    email = (formData.get("email") as string) || "";
-    password = (formData.get("password") as string) || "";
-  } else if (prevState instanceof FormData) {
-    email = (prevState.get("email") as string) || "";
-    password = (prevState.get("password") as string) || "";
-  } else if (typeof prevState === "object" && prevState !== null) {
-    email = prevState.email || "";
-    password = prevState.password || "";
-  }
-
-  if (!email || !password) {
-    return { error: "Email and password are required.", values: { email, password } };
-  }
-
-  try {
-    const user = await prisma.user.findUnique({
-      where: { email: email.trim().toLowerCase() },
-      include: {
-        role: {
-          include: {
-            rolePermissions: {
-              include: {
-                permission: true,
-              },
-            },
-          },
-        },
-      },
-    });
-
-    if (!user || !user.passwordHash) {
-      return { error: "Invalid email or password.", values: { email, password } };
-    }
-
-    const isPasswordValid = await compare(password, user.passwordHash);
-    if (!isPasswordValid) {
-      return { error: "Invalid email or password.", values: { email, password } };
-    }
-
-    const session = await getSession();
-    session.userId = user.id;
-    session.email = user.email;
-    session.name = user.name;
-    session.role = user.role?.name || "User";
-    session.permissions = user.role?.rolePermissions.map(
-      (rp) => `${rp.permission.module}:${rp.permission.action}`
-    ) || [];
-    session.isLoggedIn = true;
-    await session.save();
-  } catch (error: any) {
-    console.error("[LOGIN_ERROR]", error);
-    try {
-      const fs = require("fs");
-      const path = require("path");
-      const logDir = process.env.HMS_LOG_DIR || process.cwd();
-      const logMsg = `[LOGIN_ERROR ${new Date().toISOString()}]\n${error && error.stack ? error.stack : String(error)}\n\n`;
-      fs.appendFileSync(path.join(logDir, "server-error.log"), logMsg);
-    } catch (fsErr) {
-      console.error("Failed to write to server-error.log:", fsErr);
-    }
-    return { error: "An unexpected error occurred during login.", values: { email, password } };
-  }
-
-  revalidatePath("/", "layout");
-  redirect("/dashboard");
-}
-
-export async function logout() {
-  try {
-    const session = await getSession();
-    session.destroy();
-  } catch (err: unknown) {
-    console.error("Exception during logout:", err);
-  }
-  revalidatePath("/", "layout");
-  redirect("/login");
-}
-
-export async function getCurrentUser() {
-  const session = await getSession();
-  if (!session.isLoggedIn || !session.userId) {
-    return null;
-  }
-
-  // Fetch fresh user data from database
-  const dbUser = await prisma.user.findUnique({
-    where: { id: session.userId },
-    include: { role: true },
-  });
-
-  return {
-    id: session.userId,
-    email: dbUser?.email || session.email,
-    name: dbUser?.name || session.name,
-    role: dbUser?.role?.name || session.role,
-    permissions: session.permissions,
-  };
-}
-
-export async function updateProfile(data: {
-  name: string;
-  email: string;
-  password?: string;
-}) {
-  try {
-    const session = await getSession();
-    if (!session.isLoggedIn || !session.userId) {
-      return { success: false, error: "Unauthorized" };
-    }
-
-    const updateData: any = {
-      name: data.name,
-      email: data.email.trim().toLowerCase(),
-    };
-
-    if (data.password && data.password.trim().length > 0) {
-      updateData.passwordHash = await hash(data.password, 10);
-    }
-
-    const updatedUser = await prisma.user.update({
-      where: { id: session.userId },
-      data: updateData,
-    });
-
-    session.name = updatedUser.name;
-    session.email = updatedUser.email;
-    await session.save();
-
-    revalidatePath("/", "layout");
-    return { success: true, user: updatedUser };
-  } catch (error: unknown) {
-    console.error("Error updating profile:", error);
-    return {
-      success: false,
-      error: (error instanceof Error ? error.message : String(error)) || "Failed to update profile",
-    };
-  }
 }
 
 --- FILE: src/app/actions/appointment.ts ---
@@ -2620,6 +3022,160 @@ export async function deleteAppointment(id: string, force: boolean = false) {
   }
 }
 
+
+--- FILE: src/app/actions/auth.ts ---
+"use server";
+
+import { compare, hash } from "bcrypt";
+import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
+import { getSession } from "@/lib/session";
+import { prisma } from "@/lib/prisma";
+
+export async function login(prevState: any, formData?: FormData) {
+  // Support both (formData) and (prevState, formData) signatures
+  let email = "";
+  let password = "";
+
+  if (formData instanceof FormData) {
+    email = (formData.get("email") as string) || "";
+    password = (formData.get("password") as string) || "";
+  } else if (prevState instanceof FormData) {
+    email = (prevState.get("email") as string) || "";
+    password = (prevState.get("password") as string) || "";
+  } else if (typeof prevState === "object" && prevState !== null) {
+    email = prevState.email || "";
+    password = prevState.password || "";
+  }
+
+  if (!email || !password) {
+    return { error: "Email and password are required.", values: { email, password } };
+  }
+
+  try {
+    const user = await prisma.user.findUnique({
+      where: { email: email.trim().toLowerCase() },
+      include: {
+        role: {
+          include: {
+            rolePermissions: {
+              include: {
+                permission: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!user || !user.passwordHash) {
+      return { error: "Invalid email or password.", values: { email, password } };
+    }
+
+    const isPasswordValid = await compare(password, user.passwordHash);
+    if (!isPasswordValid) {
+      return { error: "Invalid email or password.", values: { email, password } };
+    }
+
+    const session = await getSession();
+    session.userId = user.id;
+    session.email = user.email;
+    session.name = user.name;
+    session.role = user.role?.name || "User";
+    session.permissions = user.role?.rolePermissions.map(
+      (rp) => `${rp.permission.module}:${rp.permission.action}`
+    ) || [];
+    session.isLoggedIn = true;
+    await session.save();
+  } catch (error: any) {
+    console.error("[LOGIN_ERROR]", error);
+    try {
+      const fs = require("fs");
+      const path = require("path");
+      const logDir = process.env.HMS_LOG_DIR || process.cwd();
+      const logMsg = `[LOGIN_ERROR ${new Date().toISOString()}]\n${error && error.stack ? error.stack : String(error)}\n\n`;
+      fs.appendFileSync(path.join(logDir, "server-error.log"), logMsg);
+    } catch (fsErr) {
+      console.error("Failed to write to server-error.log:", fsErr);
+    }
+    return { error: "An unexpected error occurred during login.", values: { email, password } };
+  }
+
+  revalidatePath("/", "layout");
+  redirect("/dashboard");
+}
+
+export async function logout() {
+  try {
+    const session = await getSession();
+    session.destroy();
+  } catch (err: unknown) {
+    console.error("Exception during logout:", err);
+  }
+  revalidatePath("/", "layout");
+  redirect("/login");
+}
+
+export async function getCurrentUser() {
+  const session = await getSession();
+  if (!session.isLoggedIn || !session.userId) {
+    return null;
+  }
+
+  // Fetch fresh user data from database
+  const dbUser = await prisma.user.findUnique({
+    where: { id: session.userId },
+    include: { role: true },
+  });
+
+  return {
+    id: session.userId,
+    email: dbUser?.email || session.email,
+    name: dbUser?.name || session.name,
+    role: dbUser?.role?.name || session.role,
+    permissions: session.permissions,
+  };
+}
+
+export async function updateProfile(data: {
+  name: string;
+  email: string;
+  password?: string;
+}) {
+  try {
+    const session = await getSession();
+    if (!session.isLoggedIn || !session.userId) {
+      return { success: false, error: "Unauthorized" };
+    }
+
+    const updateData: any = {
+      name: data.name,
+      email: data.email.trim().toLowerCase(),
+    };
+
+    if (data.password && data.password.trim().length > 0) {
+      updateData.passwordHash = await hash(data.password, 10);
+    }
+
+    const updatedUser = await prisma.user.update({
+      where: { id: session.userId },
+      data: updateData,
+    });
+
+    session.name = updatedUser.name;
+    session.email = updatedUser.email;
+    await session.save();
+
+    revalidatePath("/", "layout");
+    return { success: true, user: updatedUser };
+  } catch (error: unknown) {
+    console.error("Error updating profile:", error);
+    return {
+      success: false,
+      error: (error instanceof Error ? error.message : String(error)) || "Failed to update profile",
+    };
+  }
+}
 
 --- FILE: src/app/actions/billing.ts ---
 "use server";
@@ -5884,10 +6440,6 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   }
 }
 
-================================================================================
-# LEVEL 4: UI COMPONENTS, SCREENS, AND STYLING
-================================================================================
-
 --- FILE: src/app/globals.css ---
 @import "tailwindcss";
 @import "tw-animate-css";
@@ -6018,2430 +6570,6 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     @apply font-sans;
   }
 }
-
---- FILE: src/components/ui/avatar.tsx ---
-"use client"
-
-import * as React from "react"
-import { Avatar as AvatarPrimitive } from "@base-ui/react/avatar"
-
-import { cn } from "@/lib/utils"
-
-function Avatar({
-  className,
-  size = "default",
-  ...props
-}: AvatarPrimitive.Root.Props & {
-  size?: "default" | "sm" | "lg"
-}) {
-  return (
-    <AvatarPrimitive.Root
-      data-slot="avatar"
-      data-size={size}
-      className={cn(
-        "group/avatar relative flex size-8 shrink-0 rounded-full select-none after:absolute after:inset-0 after:rounded-full after:border after:border-border after:mix-blend-darken data-[size=lg]:size-10 data-[size=sm]:size-6 dark:after:mix-blend-lighten",
-        className
-      )}
-      {...props}
-    />
-  )
-}
-
-function AvatarImage({ className, ...props }: AvatarPrimitive.Image.Props) {
-  return (
-    <AvatarPrimitive.Image
-      data-slot="avatar-image"
-      className={cn(
-        "aspect-square size-full rounded-full object-cover",
-        className
-      )}
-      {...props}
-    />
-  )
-}
-
-function AvatarFallback({
-  className,
-  ...props
-}: AvatarPrimitive.Fallback.Props) {
-  return (
-    <AvatarPrimitive.Fallback
-      data-slot="avatar-fallback"
-      className={cn(
-        "flex size-full items-center justify-center rounded-full bg-muted text-sm text-muted-foreground group-data-[size=sm]/avatar:text-xs",
-        className
-      )}
-      {...props}
-    />
-  )
-}
-
-function AvatarBadge({ className, ...props }: React.ComponentProps<"span">) {
-  return (
-    <span
-      data-slot="avatar-badge"
-      className={cn(
-        "absolute right-0 bottom-0 z-10 inline-flex items-center justify-center rounded-full bg-primary text-primary-foreground bg-blend-color ring-2 ring-background select-none",
-        "group-data-[size=sm]/avatar:size-2 group-data-[size=sm]/avatar:[&>svg]:hidden",
-        "group-data-[size=default]/avatar:size-2.5 group-data-[size=default]/avatar:[&>svg]:size-2",
-        "group-data-[size=lg]/avatar:size-3 group-data-[size=lg]/avatar:[&>svg]:size-2",
-        className
-      )}
-      {...props}
-    />
-  )
-}
-
-function AvatarGroup({ className, ...props }: React.ComponentProps<"div">) {
-  return (
-    <div
-      data-slot="avatar-group"
-      className={cn(
-        "group/avatar-group flex -space-x-2 *:data-[slot=avatar]:ring-2 *:data-[slot=avatar]:ring-background",
-        className
-      )}
-      {...props}
-    />
-  )
-}
-
-function AvatarGroupCount({
-  className,
-  ...props
-}: React.ComponentProps<"div">) {
-  return (
-    <div
-      data-slot="avatar-group-count"
-      className={cn(
-        "relative flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-sm text-muted-foreground ring-2 ring-background group-has-data-[size=lg]/avatar-group:size-10 group-has-data-[size=sm]/avatar-group:size-6 [&>svg]:size-4 group-has-data-[size=lg]/avatar-group:[&>svg]:size-5 group-has-data-[size=sm]/avatar-group:[&>svg]:size-3",
-        className
-      )}
-      {...props}
-    />
-  )
-}
-
-export {
-  Avatar,
-  AvatarImage,
-  AvatarFallback,
-  AvatarGroup,
-  AvatarGroupCount,
-  AvatarBadge,
-}
-
---- FILE: src/components/ui/badge.tsx ---
-import { mergeProps } from "@base-ui/react/merge-props"
-import { useRender } from "@base-ui/react/use-render"
-import { cva, type VariantProps } from "class-variance-authority"
-
-import { cn } from "@/lib/utils"
-
-const badgeVariants = cva(
-  "group/badge inline-flex h-5 w-fit shrink-0 items-center justify-center gap-1 overflow-hidden rounded-4xl border border-transparent px-2 py-0.5 text-xs font-medium whitespace-nowrap transition-all focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 [&>svg]:pointer-events-none [&>svg]:size-3!",
-  {
-    variants: {
-      variant: {
-        default: "bg-primary text-primary-foreground [a]:hover:bg-primary/80",
-        secondary:
-          "bg-secondary text-secondary-foreground [a]:hover:bg-secondary/80",
-        destructive:
-          "bg-destructive/10 text-destructive focus-visible:ring-destructive/20 dark:bg-destructive/20 dark:focus-visible:ring-destructive/40 [a]:hover:bg-destructive/20",
-        outline:
-          "border-border text-foreground [a]:hover:bg-muted [a]:hover:text-muted-foreground",
-        ghost:
-          "hover:bg-muted hover:text-muted-foreground dark:hover:bg-muted/50",
-        link: "text-primary underline-offset-4 hover:underline",
-      },
-    },
-    defaultVariants: {
-      variant: "default",
-    },
-  }
-)
-
-function Badge({
-  className,
-  variant = "default",
-  render,
-  ...props
-}: useRender.ComponentProps<"span"> & VariantProps<typeof badgeVariants>) {
-  return useRender({
-    defaultTagName: "span",
-    props: mergeProps<"span">(
-      {
-        className: cn(badgeVariants({ variant }), className),
-      },
-      props
-    ),
-    render,
-    state: {
-      slot: "badge",
-      variant,
-    },
-  })
-}
-
-export { Badge, badgeVariants }
-
---- FILE: src/components/ui/button.tsx ---
-import { Button as ButtonPrimitive } from "@base-ui/react/button"
-import { cva, type VariantProps } from "class-variance-authority"
-
-import { cn } from "@/lib/utils"
-
-const buttonVariants = cva(
-  "group/button inline-flex shrink-0 items-center justify-center rounded-lg border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
-  {
-    variants: {
-      variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary/80",
-        outline:
-          "border-border bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50",
-        secondary:
-          "bg-secondary text-secondary-foreground hover:bg-[color-mix(in_oklch,var(--secondary),var(--foreground)_5%)] aria-expanded:bg-secondary aria-expanded:text-secondary-foreground",
-        ghost:
-          "hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:hover:bg-muted/50",
-        destructive:
-          "bg-destructive/10 text-destructive hover:bg-destructive/20 focus-visible:border-destructive/40 focus-visible:ring-destructive/20 dark:bg-destructive/20 dark:hover:bg-destructive/30 dark:focus-visible:ring-destructive/40",
-        link: "text-primary underline-offset-4 hover:underline",
-      },
-      size: {
-        default:
-          "h-8 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2",
-        xs: "h-6 gap-1 rounded-[min(var(--radius-md),10px)] px-2 text-xs in-data-[slot=button-group]:rounded-lg has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*='size-'])]:size-3",
-        sm: "h-7 gap-1 rounded-[min(var(--radius-md),12px)] px-2.5 text-[0.8rem] in-data-[slot=button-group]:rounded-lg has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*='size-'])]:size-3.5",
-        lg: "h-9 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2",
-        icon: "size-8",
-        "icon-xs":
-          "size-6 rounded-[min(var(--radius-md),10px)] in-data-[slot=button-group]:rounded-lg [&_svg:not([class*='size-'])]:size-3",
-        "icon-sm":
-          "size-7 rounded-[min(var(--radius-md),12px)] in-data-[slot=button-group]:rounded-lg",
-        "icon-lg": "size-9",
-      },
-    },
-    defaultVariants: {
-      variant: "default",
-      size: "default",
-    },
-  }
-)
-
-function Button({
-  className,
-  variant = "default",
-  size = "default",
-  ...props
-}: ButtonPrimitive.Props & VariantProps<typeof buttonVariants>) {
-  return (
-    <ButtonPrimitive
-      data-slot="button"
-      className={cn(buttonVariants({ variant, size, className }))}
-      {...props}
-    />
-  )
-}
-
-export type ButtonProps = ButtonPrimitive.Props & VariantProps<typeof buttonVariants>;
-export { Button, buttonVariants }
-
---- FILE: src/components/ui/calendar.tsx ---
-"use client"
-
-import * as React from "react"
-import {
-  DayPicker,
-  getDefaultClassNames,
-  type DayButton,
-  type Locale,
-} from "react-day-picker"
-
-import { cn } from "@/lib/utils"
-import { Button, buttonVariants } from "@/components/ui/button"
-import { ChevronLeftIcon, ChevronRightIcon, ChevronDownIcon } from "lucide-react"
-
-function Calendar({
-  className,
-  classNames,
-  showOutsideDays = true,
-  captionLayout = "label",
-  buttonVariant = "ghost",
-  locale,
-  formatters,
-  components,
-  ...props
-}: React.ComponentProps<typeof DayPicker> & {
-  buttonVariant?: React.ComponentProps<typeof Button>["variant"]
-}) {
-  const defaultClassNames = getDefaultClassNames()
-
-  return (
-    <DayPicker
-      showOutsideDays={showOutsideDays}
-      className={cn(
-        "group/calendar bg-background p-2 [--cell-radius:var(--radius-md)] [--cell-size:--spacing(7)] in-data-[slot=card-content]:bg-transparent in-data-[slot=popover-content]:bg-transparent",
-        String.raw`rtl:**:[.rdp-button\_next>svg]:rotate-180`,
-        String.raw`rtl:**:[.rdp-button\_previous>svg]:rotate-180`,
-        className
-      )}
-      captionLayout={captionLayout}
-      locale={locale}
-      formatters={{
-        formatMonthDropdown: (date) =>
-          date.toLocaleString(locale?.code, { month: "short" }),
-        ...formatters,
-      }}
-      classNames={{
-        root: cn("w-fit", defaultClassNames.root),
-        months: cn(
-          "relative flex flex-col gap-4 md:flex-row",
-          defaultClassNames.months
-        ),
-        month: cn("flex w-full flex-col gap-4", defaultClassNames.month),
-        nav: cn(
-          "absolute inset-x-0 top-0 flex w-full items-center justify-between gap-1",
-          defaultClassNames.nav
-        ),
-        button_previous: cn(
-          buttonVariants({ variant: buttonVariant }),
-          "size-(--cell-size) p-0 select-none aria-disabled:opacity-50",
-          defaultClassNames.button_previous
-        ),
-        button_next: cn(
-          buttonVariants({ variant: buttonVariant }),
-          "size-(--cell-size) p-0 select-none aria-disabled:opacity-50",
-          defaultClassNames.button_next
-        ),
-        month_caption: cn(
-          "flex h-(--cell-size) w-full items-center justify-center px-(--cell-size)",
-          defaultClassNames.month_caption
-        ),
-        dropdowns: cn(
-          "flex h-(--cell-size) w-full items-center justify-center gap-1.5 text-sm font-medium",
-          defaultClassNames.dropdowns
-        ),
-        dropdown_root: cn(
-          "relative rounded-(--cell-radius)",
-          defaultClassNames.dropdown_root
-        ),
-        dropdown: cn(
-          "absolute inset-0 bg-popover opacity-0",
-          defaultClassNames.dropdown
-        ),
-        caption_label: cn(
-          "font-medium select-none",
-          captionLayout === "label"
-            ? "text-sm"
-            : "flex items-center gap-1 rounded-(--cell-radius) text-sm [&>svg]:size-3.5 [&>svg]:text-muted-foreground",
-          defaultClassNames.caption_label
-        ),
-        month_grid: cn("w-full border-collapse", defaultClassNames.month_grid),
-        weekdays: cn("flex", defaultClassNames.weekdays),
-        weekday: cn(
-          "flex-1 rounded-(--cell-radius) text-[0.8rem] font-normal text-muted-foreground select-none",
-          defaultClassNames.weekday
-        ),
-        week: cn("mt-2 flex w-full", defaultClassNames.week),
-        week_number_header: cn(
-          "w-(--cell-size) select-none",
-          defaultClassNames.week_number_header
-        ),
-        week_number: cn(
-          "text-[0.8rem] text-muted-foreground select-none",
-          defaultClassNames.week_number
-        ),
-        day: cn(
-          "group/day relative aspect-square h-full w-full rounded-(--cell-radius) p-0 text-center select-none [&:last-child[data-selected=true]_button]:rounded-r-(--cell-radius)",
-          props.showWeekNumber
-            ? "[&:nth-child(2)[data-selected=true]_button]:rounded-l-(--cell-radius)"
-            : "[&:first-child[data-selected=true]_button]:rounded-l-(--cell-radius)",
-          defaultClassNames.day
-        ),
-        range_start: cn(
-          "relative isolate z-0 rounded-l-(--cell-radius) bg-muted after:absolute after:inset-y-0 after:right-0 after:w-4 after:bg-muted",
-          defaultClassNames.range_start
-        ),
-        range_middle: cn("rounded-none", defaultClassNames.range_middle),
-        range_end: cn(
-          "relative isolate z-0 rounded-r-(--cell-radius) bg-muted after:absolute after:inset-y-0 after:left-0 after:w-4 after:bg-muted",
-          defaultClassNames.range_end
-        ),
-        today: cn(
-          "rounded-(--cell-radius) bg-muted text-foreground data-[selected=true]:rounded-none",
-          defaultClassNames.today
-        ),
-        outside: cn(
-          "text-muted-foreground aria-selected:text-muted-foreground",
-          defaultClassNames.outside
-        ),
-        disabled: cn(
-          "text-muted-foreground opacity-50",
-          defaultClassNames.disabled
-        ),
-        hidden: cn("invisible", defaultClassNames.hidden),
-        ...classNames,
-      }}
-      components={{
-        Root: ({ className, rootRef, ...props }) => {
-          return (
-            <div
-              data-slot="calendar"
-              ref={rootRef}
-              className={cn(className)}
-              {...props}
-            />
-          )
-        },
-        Chevron: ({ className, orientation, ...props }) => {
-          if (orientation === "left") {
-            return (
-              <ChevronLeftIcon className={cn("size-4", className)} {...props} />
-            )
-          }
-
-          if (orientation === "right") {
-            return (
-              <ChevronRightIcon className={cn("size-4", className)} {...props} />
-            )
-          }
-
-          return (
-            <ChevronDownIcon className={cn("size-4", className)} {...props} />
-          )
-        },
-        DayButton: ({ ...props }) => (
-          <CalendarDayButton locale={locale} {...props} />
-        ),
-        WeekNumber: ({ children, ...props }) => {
-          return (
-            <td {...props}>
-              <div className="flex size-(--cell-size) items-center justify-center text-center">
-                {children}
-              </div>
-            </td>
-          )
-        },
-        ...components,
-      }}
-      {...props}
-    />
-  )
-}
-
-function CalendarDayButton({
-  className,
-  day,
-  modifiers,
-  locale,
-  ...props
-}: React.ComponentProps<typeof DayButton> & { locale?: Partial<Locale> }) {
-  const defaultClassNames = getDefaultClassNames()
-
-  const ref = React.useRef<HTMLButtonElement>(null)
-  React.useEffect(() => {
-    if (modifiers.focused) ref.current?.focus()
-  }, [modifiers.focused])
-
-  return (
-    <Button
-      variant="ghost"
-      size="icon"
-      data-day={day.date.toLocaleDateString(locale?.code)}
-      data-selected-single={
-        modifiers.selected &&
-        !modifiers.range_start &&
-        !modifiers.range_end &&
-        !modifiers.range_middle
-      }
-      data-range-start={modifiers.range_start}
-      data-range-end={modifiers.range_end}
-      data-range-middle={modifiers.range_middle}
-      className={cn(
-        "relative isolate z-10 flex aspect-square size-auto w-full min-w-(--cell-size) flex-col gap-1 border-0 leading-none font-normal group-data-[focused=true]/day:relative group-data-[focused=true]/day:z-10 group-data-[focused=true]/day:border-ring group-data-[focused=true]/day:ring-[3px] group-data-[focused=true]/day:ring-ring/50 data-[range-end=true]:rounded-(--cell-radius) data-[range-end=true]:rounded-r-(--cell-radius) data-[range-end=true]:bg-primary data-[range-end=true]:text-primary-foreground data-[range-middle=true]:rounded-none data-[range-middle=true]:bg-muted data-[range-middle=true]:text-foreground data-[range-start=true]:rounded-(--cell-radius) data-[range-start=true]:rounded-l-(--cell-radius) data-[range-start=true]:bg-primary data-[range-start=true]:text-primary-foreground data-[selected-single=true]:bg-primary data-[selected-single=true]:text-primary-foreground dark:hover:text-foreground [&>span]:text-xs [&>span]:opacity-70",
-        defaultClassNames.day,
-        className
-      )}
-      {...props}
-    />
-  )
-}
-
-export { Calendar, CalendarDayButton }
-
---- FILE: src/components/ui/card.tsx ---
-import * as React from "react"
-
-import { cn } from "@/lib/utils"
-
-function Card({
-  className,
-  size = "default",
-  ...props
-}: React.ComponentProps<"div"> & { size?: "default" | "sm" }) {
-  return (
-    <div
-      data-slot="card"
-      data-size={size}
-      className={cn(
-        "group/card flex flex-col gap-(--card-spacing) overflow-hidden rounded-xl bg-card py-(--card-spacing) text-sm text-card-foreground ring-1 ring-foreground/10 [--card-spacing:--spacing(4)] has-data-[slot=card-footer]:pb-0 has-[>img:first-child]:pt-0 data-[size=sm]:[--card-spacing:--spacing(3)] data-[size=sm]:has-data-[slot=card-footer]:pb-0 *:[img:first-child]:rounded-t-xl *:[img:last-child]:rounded-b-xl",
-        className
-      )}
-      {...props}
-    />
-  )
-}
-
-function CardHeader({ className, ...props }: React.ComponentProps<"div">) {
-  return (
-    <div
-      data-slot="card-header"
-      className={cn(
-        "group/card-header @container/card-header grid auto-rows-min items-start gap-1 rounded-t-xl px-(--card-spacing) has-data-[slot=card-action]:grid-cols-[1fr_auto] has-data-[slot=card-description]:grid-rows-[auto_auto] [.border-b]:pb-(--card-spacing)",
-        className
-      )}
-      {...props}
-    />
-  )
-}
-
-function CardTitle({ className, ...props }: React.ComponentProps<"div">) {
-  return (
-    <div
-      data-slot="card-title"
-      className={cn(
-        "text-base leading-snug font-medium group-data-[size=sm]/card:text-sm",
-        className
-      )}
-      {...props}
-    />
-  )
-}
-
-function CardDescription({ className, ...props }: React.ComponentProps<"div">) {
-  return (
-    <div
-      data-slot="card-description"
-      className={cn("text-sm text-muted-foreground", className)}
-      {...props}
-    />
-  )
-}
-
-function CardAction({ className, ...props }: React.ComponentProps<"div">) {
-  return (
-    <div
-      data-slot="card-action"
-      className={cn(
-        "col-start-2 row-span-2 row-start-1 self-start justify-self-end",
-        className
-      )}
-      {...props}
-    />
-  )
-}
-
-function CardContent({ className, ...props }: React.ComponentProps<"div">) {
-  return (
-    <div
-      data-slot="card-content"
-      className={cn("px-(--card-spacing)", className)}
-      {...props}
-    />
-  )
-}
-
-function CardFooter({ className, ...props }: React.ComponentProps<"div">) {
-  return (
-    <div
-      data-slot="card-footer"
-      className={cn(
-        "flex items-center rounded-b-xl border-t bg-muted/50 p-(--card-spacing)",
-        className
-      )}
-      {...props}
-    />
-  )
-}
-
-export {
-  Card,
-  CardHeader,
-  CardFooter,
-  CardTitle,
-  CardAction,
-  CardDescription,
-  CardContent,
-}
-
---- FILE: src/components/ui/command.tsx ---
-"use client"
-
-import * as React from "react"
-import { Command as CommandPrimitive } from "cmdk"
-
-import { cn } from "@/lib/utils"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import {
-  InputGroup,
-  InputGroupAddon,
-} from "@/components/ui/input-group"
-import { SearchIcon, CheckIcon } from "lucide-react"
-
-function Command({
-  className,
-  ...props
-}: React.ComponentProps<typeof CommandPrimitive>) {
-  return (
-    <CommandPrimitive
-      data-slot="command"
-      className={cn(
-        "flex size-full flex-col overflow-hidden rounded-xl! bg-popover p-1 text-popover-foreground",
-        className
-      )}
-      {...props}
-    />
-  )
-}
-
-function CommandDialog({
-  title = "Command Palette",
-  description = "Search for a command to run...",
-  children,
-  className,
-  showCloseButton = false,
-  ...props
-}: Omit<React.ComponentProps<typeof Dialog>, "children"> & {
-  title?: string
-  description?: string
-  className?: string
-  showCloseButton?: boolean
-  children: React.ReactNode
-}) {
-  return (
-    <Dialog {...props}>
-      <DialogHeader className="sr-only">
-        <DialogTitle>{title}</DialogTitle>
-        <DialogDescription>{description}</DialogDescription>
-      </DialogHeader>
-      <DialogContent
-        className={cn(
-          "top-1/3 translate-y-0 overflow-hidden rounded-xl! p-0",
-          className
-        )}
-        showCloseButton={showCloseButton}
-      >
-        {children}
-      </DialogContent>
-    </Dialog>
-  )
-}
-
-function CommandInput({
-  className,
-  ...props
-}: React.ComponentProps<typeof CommandPrimitive.Input>) {
-  return (
-    <div data-slot="command-input-wrapper" className="p-1 pb-0">
-      <InputGroup className="h-8! rounded-lg! border-input/30 bg-input/30 shadow-none! *:data-[slot=input-group-addon]:pl-2!">
-        <CommandPrimitive.Input
-          data-slot="command-input"
-          className={cn(
-            "w-full text-sm outline-hidden disabled:cursor-not-allowed disabled:opacity-50",
-            className
-          )}
-          {...props}
-        />
-        <InputGroupAddon>
-          <SearchIcon className="size-4 shrink-0 opacity-50" />
-        </InputGroupAddon>
-      </InputGroup>
-    </div>
-  )
-}
-
-function CommandList({
-  className,
-  ...props
-}: React.ComponentProps<typeof CommandPrimitive.List>) {
-  return (
-    <CommandPrimitive.List
-      data-slot="command-list"
-      className={cn(
-        "no-scrollbar max-h-72 scroll-py-1 overflow-x-hidden overflow-y-auto outline-none",
-        className
-      )}
-      {...props}
-    />
-  )
-}
-
-function CommandEmpty({
-  className,
-  ...props
-}: React.ComponentProps<typeof CommandPrimitive.Empty>) {
-  return (
-    <CommandPrimitive.Empty
-      data-slot="command-empty"
-      className={cn("py-6 text-center text-sm", className)}
-      {...props}
-    />
-  )
-}
-
-function CommandGroup({
-  className,
-  ...props
-}: React.ComponentProps<typeof CommandPrimitive.Group>) {
-  return (
-    <CommandPrimitive.Group
-      data-slot="command-group"
-      className={cn(
-        "overflow-hidden p-1 text-foreground **:[[cmdk-group-heading]]:px-2 **:[[cmdk-group-heading]]:py-1.5 **:[[cmdk-group-heading]]:text-xs **:[[cmdk-group-heading]]:font-medium **:[[cmdk-group-heading]]:text-muted-foreground",
-        className
-      )}
-      {...props}
-    />
-  )
-}
-
-function CommandSeparator({
-  className,
-  ...props
-}: React.ComponentProps<typeof CommandPrimitive.Separator>) {
-  return (
-    <CommandPrimitive.Separator
-      data-slot="command-separator"
-      className={cn("-mx-1 h-px bg-border", className)}
-      {...props}
-    />
-  )
-}
-
-function CommandItem({
-  className,
-  children,
-  ...props
-}: React.ComponentProps<typeof CommandPrimitive.Item>) {
-  return (
-    <CommandPrimitive.Item
-      data-slot="command-item"
-      className={cn(
-        "group/command-item relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-hidden select-none in-data-[slot=dialog-content]:rounded-lg! data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50 data-selected:bg-muted data-selected:text-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 data-selected:*:[svg]:text-foreground",
-        className
-      )}
-      {...props}
-    >
-      {children}
-      <CheckIcon className="ml-auto opacity-0 group-has-data-[slot=command-shortcut]/command-item:hidden group-data-[checked=true]/command-item:opacity-100" />
-    </CommandPrimitive.Item>
-  )
-}
-
-function CommandShortcut({
-  className,
-  ...props
-}: React.ComponentProps<"span">) {
-  return (
-    <span
-      data-slot="command-shortcut"
-      className={cn(
-        "ml-auto text-xs tracking-widest text-muted-foreground group-data-selected/command-item:text-foreground",
-        className
-      )}
-      {...props}
-    />
-  )
-}
-
-export {
-  Command,
-  CommandDialog,
-  CommandInput,
-  CommandList,
-  CommandEmpty,
-  CommandGroup,
-  CommandItem,
-  CommandShortcut,
-  CommandSeparator,
-}
-
---- FILE: src/components/ui/dialog.tsx ---
-"use client"
-
-import * as React from "react"
-import { Dialog as DialogPrimitive } from "@base-ui/react/dialog"
-
-import { cn } from "@/lib/utils"
-import { Button } from "@/components/ui/button"
-import { XIcon } from "lucide-react"
-
-function Dialog({ ...props }: DialogPrimitive.Root.Props) {
-  return <DialogPrimitive.Root data-slot="dialog" {...props} />
-}
-
-function DialogTrigger({ ...props }: DialogPrimitive.Trigger.Props) {
-  return <DialogPrimitive.Trigger data-slot="dialog-trigger" {...props} />
-}
-
-function DialogPortal({ ...props }: DialogPrimitive.Portal.Props) {
-  return <DialogPrimitive.Portal data-slot="dialog-portal" {...props} />
-}
-
-function DialogClose({ ...props }: DialogPrimitive.Close.Props) {
-  return <DialogPrimitive.Close data-slot="dialog-close" {...props} />
-}
-
-function DialogOverlay({
-  className,
-  ...props
-}: DialogPrimitive.Backdrop.Props) {
-  return (
-    <DialogPrimitive.Backdrop
-      data-slot="dialog-overlay"
-      className={cn(
-        "fixed inset-0 isolate z-50 bg-black/10 duration-100 supports-backdrop-filter:backdrop-blur-xs data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0",
-        className
-      )}
-      {...props}
-    />
-  )
-}
-
-function DialogContent({
-  className,
-  children,
-  showCloseButton = true,
-  ...props
-}: DialogPrimitive.Popup.Props & {
-  showCloseButton?: boolean
-}) {
-  return (
-    <DialogPortal>
-      <DialogOverlay />
-      <DialogPrimitive.Popup
-        data-slot="dialog-content"
-        className={cn(
-          "fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl bg-popover p-4 text-sm text-popover-foreground ring-1 ring-foreground/10 duration-100 outline-none sm:max-w-sm data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
-          className
-        )}
-        {...props}
-      >
-        {children}
-        {showCloseButton && (
-          <DialogPrimitive.Close
-            data-slot="dialog-close"
-            render={
-              <Button
-                variant="ghost"
-                className="absolute top-2 right-2"
-                size="icon-sm"
-              />
-            }
-          >
-            <XIcon
-            />
-            <span className="sr-only">Close</span>
-          </DialogPrimitive.Close>
-        )}
-      </DialogPrimitive.Popup>
-    </DialogPortal>
-  )
-}
-
-function DialogHeader({ className, ...props }: React.ComponentProps<"div">) {
-  return (
-    <div
-      data-slot="dialog-header"
-      className={cn("flex flex-col gap-2", className)}
-      {...props}
-    />
-  )
-}
-
-function DialogFooter({
-  className,
-  showCloseButton = false,
-  children,
-  ...props
-}: React.ComponentProps<"div"> & {
-  showCloseButton?: boolean
-}) {
-  return (
-    <div
-      data-slot="dialog-footer"
-      className={cn(
-        "-mx-4 -mb-4 flex flex-col-reverse gap-2 rounded-b-xl border-t bg-muted/50 p-4 sm:flex-row sm:justify-end",
-        className
-      )}
-      {...props}
-    >
-      {children}
-      {showCloseButton && (
-        <DialogPrimitive.Close render={<Button variant="outline" />}>
-          Close
-        </DialogPrimitive.Close>
-      )}
-    </div>
-  )
-}
-
-function DialogTitle({ className, ...props }: DialogPrimitive.Title.Props) {
-  return (
-    <DialogPrimitive.Title
-      data-slot="dialog-title"
-      className={cn(
-        "text-base leading-none font-medium",
-        className
-      )}
-      {...props}
-    />
-  )
-}
-
-function DialogDescription({
-  className,
-  ...props
-}: DialogPrimitive.Description.Props) {
-  return (
-    <DialogPrimitive.Description
-      data-slot="dialog-description"
-      className={cn(
-        "text-sm text-muted-foreground *:[a]:underline *:[a]:underline-offset-3 *:[a]:hover:text-foreground",
-        className
-      )}
-      {...props}
-    />
-  )
-}
-
-export {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogOverlay,
-  DialogPortal,
-  DialogTitle,
-  DialogTrigger,
-}
-
---- FILE: src/components/ui/dropdown-menu.tsx ---
-"use client"
-
-import * as React from "react"
-import { Menu as MenuPrimitive } from "@base-ui/react/menu"
-
-import { cn } from "@/lib/utils"
-import { ChevronRightIcon, CheckIcon } from "lucide-react"
-
-function DropdownMenu({ ...props }: MenuPrimitive.Root.Props) {
-  return <MenuPrimitive.Root data-slot="dropdown-menu" {...props} />
-}
-
-function DropdownMenuPortal({ ...props }: MenuPrimitive.Portal.Props) {
-  return <MenuPrimitive.Portal data-slot="dropdown-menu-portal" {...props} />
-}
-
-function DropdownMenuTrigger({ ...props }: MenuPrimitive.Trigger.Props) {
-  return <MenuPrimitive.Trigger data-slot="dropdown-menu-trigger" {...props} />
-}
-
-function DropdownMenuContent({
-  align = "start",
-  alignOffset = 0,
-  side = "bottom",
-  sideOffset = 4,
-  className,
-  ...props
-}: MenuPrimitive.Popup.Props &
-  Pick<
-    MenuPrimitive.Positioner.Props,
-    "align" | "alignOffset" | "side" | "sideOffset"
-  >) {
-  return (
-    <MenuPrimitive.Portal>
-      <MenuPrimitive.Positioner
-        className="isolate z-50 outline-none"
-        align={align}
-        alignOffset={alignOffset}
-        side={side}
-        sideOffset={sideOffset}
-      >
-        <MenuPrimitive.Popup
-          data-slot="dropdown-menu-content"
-          className={cn("z-50 max-h-(--available-height) w-(--anchor-width) min-w-32 origin-(--transform-origin) overflow-x-hidden overflow-y-auto rounded-lg bg-popover p-1 text-popover-foreground shadow-md ring-1 ring-foreground/10 duration-100 outline-none data-[side=bottom]:slide-in-from-top-2 data-[side=inline-end]:slide-in-from-left-2 data-[side=inline-start]:slide-in-from-right-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:overflow-hidden data-closed:fade-out-0 data-closed:zoom-out-95", className )}
-          {...props}
-        />
-      </MenuPrimitive.Positioner>
-    </MenuPrimitive.Portal>
-  )
-}
-
-function DropdownMenuGroup({ ...props }: MenuPrimitive.Group.Props) {
-  return <MenuPrimitive.Group data-slot="dropdown-menu-group" {...props} />
-}
-
-function DropdownMenuLabel({
-  className,
-  inset,
-  ...props
-}: MenuPrimitive.GroupLabel.Props & {
-  inset?: boolean
-}) {
-  return (
-    <MenuPrimitive.GroupLabel
-      data-slot="dropdown-menu-label"
-      data-inset={inset}
-      className={cn(
-        "px-1.5 py-1 text-xs font-medium text-muted-foreground data-inset:pl-7",
-        className
-      )}
-      {...props}
-    />
-  )
-}
-
-function DropdownMenuItem({
-  className,
-  inset,
-  variant = "default",
-  ...props
-}: MenuPrimitive.Item.Props & {
-  inset?: boolean
-  variant?: "default" | "destructive"
-}) {
-  return (
-    <MenuPrimitive.Item
-      data-slot="dropdown-menu-item"
-      data-inset={inset}
-      data-variant={variant}
-      className={cn(
-        "group/dropdown-menu-item relative flex cursor-default items-center gap-1.5 rounded-md px-1.5 py-1 text-sm outline-hidden select-none focus:bg-accent focus:text-accent-foreground not-data-[variant=destructive]:focus:**:text-accent-foreground data-inset:pl-7 data-[variant=destructive]:text-destructive data-[variant=destructive]:focus:bg-destructive/10 data-[variant=destructive]:focus:text-destructive dark:data-[variant=destructive]:focus:bg-destructive/20 data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 data-[variant=destructive]:*:[svg]:text-destructive",
-        className
-      )}
-      {...props}
-    />
-  )
-}
-
-function DropdownMenuSub({ ...props }: MenuPrimitive.SubmenuRoot.Props) {
-  return <MenuPrimitive.SubmenuRoot data-slot="dropdown-menu-sub" {...props} />
-}
-
-function DropdownMenuSubTrigger({
-  className,
-  inset,
-  children,
-  ...props
-}: MenuPrimitive.SubmenuTrigger.Props & {
-  inset?: boolean
-}) {
-  return (
-    <MenuPrimitive.SubmenuTrigger
-      data-slot="dropdown-menu-sub-trigger"
-      data-inset={inset}
-      className={cn(
-        "flex cursor-default items-center gap-1.5 rounded-md px-1.5 py-1 text-sm outline-hidden select-none focus:bg-accent focus:text-accent-foreground not-data-[variant=destructive]:focus:**:text-accent-foreground data-inset:pl-7 data-popup-open:bg-accent data-popup-open:text-accent-foreground data-open:bg-accent data-open:text-accent-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
-        className
-      )}
-      {...props}
-    >
-      {children}
-      <ChevronRightIcon className="ml-auto" />
-    </MenuPrimitive.SubmenuTrigger>
-  )
-}
-
-function DropdownMenuSubContent({
-  align = "start",
-  alignOffset = -3,
-  side = "right",
-  sideOffset = 0,
-  className,
-  ...props
-}: React.ComponentProps<typeof DropdownMenuContent>) {
-  return (
-    <DropdownMenuContent
-      data-slot="dropdown-menu-sub-content"
-      className={cn("w-auto min-w-[96px] rounded-lg bg-popover p-1 text-popover-foreground shadow-lg ring-1 ring-foreground/10 duration-100 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95", className )}
-      align={align}
-      alignOffset={alignOffset}
-      side={side}
-      sideOffset={sideOffset}
-      {...props}
-    />
-  )
-}
-
-function DropdownMenuCheckboxItem({
-  className,
-  children,
-  checked,
-  inset,
-  ...props
-}: MenuPrimitive.CheckboxItem.Props & {
-  inset?: boolean
-}) {
-  return (
-    <MenuPrimitive.CheckboxItem
-      data-slot="dropdown-menu-checkbox-item"
-      data-inset={inset}
-      className={cn(
-        "relative flex cursor-default items-center gap-1.5 rounded-md py-1 pr-8 pl-1.5 text-sm outline-hidden select-none focus:bg-accent focus:text-accent-foreground focus:**:text-accent-foreground data-inset:pl-7 data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
-        className
-      )}
-      checked={checked}
-      {...props}
-    >
-      <span
-        className="pointer-events-none absolute right-2 flex items-center justify-center"
-        data-slot="dropdown-menu-checkbox-item-indicator"
-      >
-        <MenuPrimitive.CheckboxItemIndicator>
-          <CheckIcon
-          />
-        </MenuPrimitive.CheckboxItemIndicator>
-      </span>
-      {children}
-    </MenuPrimitive.CheckboxItem>
-  )
-}
-
-function DropdownMenuRadioGroup({ ...props }: MenuPrimitive.RadioGroup.Props) {
-  return (
-    <MenuPrimitive.RadioGroup
-      data-slot="dropdown-menu-radio-group"
-      {...props}
-    />
-  )
-}
-
-function DropdownMenuRadioItem({
-  className,
-  children,
-  inset,
-  ...props
-}: MenuPrimitive.RadioItem.Props & {
-  inset?: boolean
-}) {
-  return (
-    <MenuPrimitive.RadioItem
-      data-slot="dropdown-menu-radio-item"
-      data-inset={inset}
-      className={cn(
-        "relative flex cursor-default items-center gap-1.5 rounded-md py-1 pr-8 pl-1.5 text-sm outline-hidden select-none focus:bg-accent focus:text-accent-foreground focus:**:text-accent-foreground data-inset:pl-7 data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
-        className
-      )}
-      {...props}
-    >
-      <span
-        className="pointer-events-none absolute right-2 flex items-center justify-center"
-        data-slot="dropdown-menu-radio-item-indicator"
-      >
-        <MenuPrimitive.RadioItemIndicator>
-          <CheckIcon
-          />
-        </MenuPrimitive.RadioItemIndicator>
-      </span>
-      {children}
-    </MenuPrimitive.RadioItem>
-  )
-}
-
-function DropdownMenuSeparator({
-  className,
-  ...props
-}: MenuPrimitive.Separator.Props) {
-  return (
-    <MenuPrimitive.Separator
-      data-slot="dropdown-menu-separator"
-      className={cn("-mx-1 my-1 h-px bg-border", className)}
-      {...props}
-    />
-  )
-}
-
-function DropdownMenuShortcut({
-  className,
-  ...props
-}: React.ComponentProps<"span">) {
-  return (
-    <span
-      data-slot="dropdown-menu-shortcut"
-      className={cn(
-        "ml-auto text-xs tracking-widest text-muted-foreground group-focus/dropdown-menu-item:text-accent-foreground",
-        className
-      )}
-      {...props}
-    />
-  )
-}
-
-export {
-  DropdownMenu,
-  DropdownMenuPortal,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuLabel,
-  DropdownMenuItem,
-  DropdownMenuCheckboxItem,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuSeparator,
-  DropdownMenuShortcut,
-  DropdownMenuSub,
-  DropdownMenuSubTrigger,
-  DropdownMenuSubContent,
-}
-
---- FILE: src/components/ui/input.tsx ---
-import * as React from "react"
-import { Input as InputPrimitive } from "@base-ui/react/input"
-
-import { cn } from "@/lib/utils"
-
-function Input({ className, type, ...props }: React.ComponentProps<"input">) {
-  return (
-    <InputPrimitive
-      type={type}
-      data-slot="input"
-      className={cn(
-        "h-8 w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-1 text-base transition-colors outline-none file:inline-flex file:h-6 file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:cursor-not-allowed disabled:bg-input/50 disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 md:text-sm dark:bg-input/30 dark:disabled:bg-input/80 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40",
-        className
-      )}
-      {...props}
-    />
-  )
-}
-
-export { Input }
-
---- FILE: src/components/ui/input-group.tsx ---
-"use client"
-
-import * as React from "react"
-import { cva, type VariantProps } from "class-variance-authority"
-
-import { cn } from "@/lib/utils"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
-
-function InputGroup({ className, ...props }: React.ComponentProps<"div">) {
-  return (
-    <div
-      data-slot="input-group"
-      role="group"
-      className={cn(
-        "group/input-group relative flex h-8 w-full min-w-0 items-center rounded-lg border border-input transition-colors outline-none in-data-[slot=combobox-content]:focus-within:border-inherit in-data-[slot=combobox-content]:focus-within:ring-0 has-disabled:bg-input/50 has-disabled:opacity-50 has-[[data-slot=input-group-control]:focus-visible]:border-ring has-[[data-slot=input-group-control]:focus-visible]:ring-3 has-[[data-slot=input-group-control]:focus-visible]:ring-ring/50 has-[[data-slot][aria-invalid=true]]:border-destructive has-[[data-slot][aria-invalid=true]]:ring-3 has-[[data-slot][aria-invalid=true]]:ring-destructive/20 has-[>[data-align=block-end]]:h-auto has-[>[data-align=block-end]]:flex-col has-[>[data-align=block-start]]:h-auto has-[>[data-align=block-start]]:flex-col has-[>textarea]:h-auto dark:bg-input/30 dark:has-disabled:bg-input/80 dark:has-[[data-slot][aria-invalid=true]]:ring-destructive/40 has-[>[data-align=block-end]]:[&>input]:pt-3 has-[>[data-align=block-start]]:[&>input]:pb-3 has-[>[data-align=inline-end]]:[&>input]:pr-1.5 has-[>[data-align=inline-start]]:[&>input]:pl-1.5",
-        className
-      )}
-      {...props}
-    />
-  )
-}
-
-const inputGroupAddonVariants = cva(
-  "flex h-auto cursor-text items-center justify-center gap-2 py-1.5 text-sm font-medium text-muted-foreground select-none group-data-[disabled=true]/input-group:opacity-50 [&>kbd]:rounded-[calc(var(--radius)-5px)] [&>svg:not([class*='size-'])]:size-4",
-  {
-    variants: {
-      align: {
-        "inline-start":
-          "order-first pl-2 has-[>button]:ml-[-0.3rem] has-[>kbd]:ml-[-0.15rem]",
-        "inline-end":
-          "order-last pr-2 has-[>button]:mr-[-0.3rem] has-[>kbd]:mr-[-0.15rem]",
-        "block-start":
-          "order-first w-full justify-start px-2.5 pt-2 group-has-[>input]/input-group:pt-2 [.border-b]:pb-2",
-        "block-end":
-          "order-last w-full justify-start px-2.5 pb-2 group-has-[>input]/input-group:pb-2 [.border-t]:pt-2",
-      },
-    },
-    defaultVariants: {
-      align: "inline-start",
-    },
-  }
-)
-
-function InputGroupAddon({
-  className,
-  align = "inline-start",
-  ...props
-}: React.ComponentProps<"div"> & VariantProps<typeof inputGroupAddonVariants>) {
-  return (
-    <div
-      role="group"
-      data-slot="input-group-addon"
-      data-align={align}
-      className={cn(inputGroupAddonVariants({ align }), className)}
-      onClick={(e) => {
-        if ((e.target as HTMLElement).closest("button")) {
-          return
-        }
-        e.currentTarget.parentElement?.querySelector("input")?.focus()
-      }}
-      {...props}
-    />
-  )
-}
-
-const inputGroupButtonVariants = cva(
-  "flex items-center gap-2 text-sm shadow-none",
-  {
-    variants: {
-      size: {
-        xs: "h-6 gap-1 rounded-[calc(var(--radius)-3px)] px-1.5 [&>svg:not([class*='size-'])]:size-3.5",
-        sm: "",
-        "icon-xs":
-          "size-6 rounded-[calc(var(--radius)-3px)] p-0 has-[>svg]:p-0",
-        "icon-sm": "size-8 p-0 has-[>svg]:p-0",
-      },
-    },
-    defaultVariants: {
-      size: "xs",
-    },
-  }
-)
-
-function InputGroupButton({
-  className,
-  type = "button",
-  variant = "ghost",
-  size = "xs",
-  ...props
-}: Omit<React.ComponentProps<typeof Button>, "size" | "type"> &
-  VariantProps<typeof inputGroupButtonVariants> & {
-    type?: "button" | "submit" | "reset"
-  }) {
-  return (
-    <Button
-      type={type}
-      data-size={size}
-      variant={variant}
-      className={cn(inputGroupButtonVariants({ size }), className)}
-      {...props}
-    />
-  )
-}
-
-function InputGroupText({ className, ...props }: React.ComponentProps<"span">) {
-  return (
-    <span
-      className={cn(
-        "flex items-center gap-2 text-sm text-muted-foreground [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4",
-        className
-      )}
-      {...props}
-    />
-  )
-}
-
-function InputGroupInput({
-  className,
-  ...props
-}: React.ComponentProps<"input">) {
-  return (
-    <Input
-      data-slot="input-group-control"
-      className={cn(
-        "flex-1 rounded-none border-0 bg-transparent shadow-none ring-0 focus-visible:ring-0 disabled:bg-transparent aria-invalid:ring-0 dark:bg-transparent dark:disabled:bg-transparent",
-        className
-      )}
-      {...props}
-    />
-  )
-}
-
-function InputGroupTextarea({
-  className,
-  ...props
-}: React.ComponentProps<"textarea">) {
-  return (
-    <Textarea
-      data-slot="input-group-control"
-      className={cn(
-        "flex-1 resize-none rounded-none border-0 bg-transparent py-2 shadow-none ring-0 focus-visible:ring-0 disabled:bg-transparent aria-invalid:ring-0 dark:bg-transparent dark:disabled:bg-transparent",
-        className
-      )}
-      {...props}
-    />
-  )
-}
-
-export {
-  InputGroup,
-  InputGroupAddon,
-  InputGroupButton,
-  InputGroupText,
-  InputGroupInput,
-  InputGroupTextarea,
-}
-
---- FILE: src/components/ui/label.tsx ---
-"use client"
-
-import * as React from "react"
-
-import { cn } from "@/lib/utils"
-
-function Label({ className, ...props }: React.ComponentProps<"label">) {
-  return (
-    <label
-      data-slot="label"
-      className={cn(
-        "flex items-center gap-2 text-sm leading-none font-medium select-none group-data-[disabled=true]:pointer-events-none group-data-[disabled=true]:opacity-50 peer-disabled:cursor-not-allowed peer-disabled:opacity-50",
-        className
-      )}
-      {...props}
-    />
-  )
-}
-
-export { Label }
-
---- FILE: src/components/ui/phone-number-input.tsx ---
-"use client";
-
-import React, { useState, useEffect, useId, useMemo } from "react";
-import { CheckCircle2, AlertCircle, ChevronDown } from "lucide-react";
-
-export interface CountryOption {
-  code: string; // e.g. "+92"
-  iso: string; // e.g. "PK"
-  name: string; // e.g. "Pakistan"
-  flag: string; // e.g. "🇵🇰"
-  digits: number; // e.g. 10
-  formatDisplay: (raw: string) => string;
-  validate: (raw: string) => boolean;
-  placeholder: string;
-}
-
-export const COUNTRIES: CountryOption[] = [
-  {
-    code: "+92",
-    iso: "PK",
-    name: "Pakistan",
-    flag: "🇵🇰",
-    digits: 10,
-    placeholder: "300-1234567",
-    formatDisplay: (d) => (d.length <= 3 ? d : `${d.slice(0, 3)}-${d.slice(3, 10)}`),
-    validate: (d) => /^3\d{9}$/.test(d),
-  },
-  {
-    code: "+966",
-    iso: "SA",
-    name: "Saudi Arabia",
-    flag: "🇸🇦",
-    digits: 9,
-    placeholder: "50-123-4567",
-    formatDisplay: (d) =>
-      d.length <= 2 ? d : d.length <= 5 ? `${d.slice(0, 2)}-${d.slice(2)}` : `${d.slice(0, 2)}-${d.slice(2, 5)}-${d.slice(5, 9)}`,
-    validate: (d) => /^5\d{8}$/.test(d),
-  },
-  {
-    code: "+971",
-    iso: "AE",
-    name: "UAE",
-    flag: "🇦🇪",
-    digits: 9,
-    placeholder: "50-123-4567",
-    formatDisplay: (d) =>
-      d.length <= 2 ? d : d.length <= 5 ? `${d.slice(0, 2)}-${d.slice(2)}` : `${d.slice(0, 2)}-${d.slice(2, 5)}-${d.slice(5, 9)}`,
-    validate: (d) => /^5\d{8}$/.test(d),
-  },
-  {
-    code: "+44",
-    iso: "GB",
-    name: "United Kingdom",
-    flag: "🇬🇧",
-    digits: 10,
-    placeholder: "7911-123456",
-    formatDisplay: (d) => (d.length <= 4 ? d : `${d.slice(0, 4)}-${d.slice(4, 10)}`),
-    validate: (d) => d.length >= 10,
-  },
-  {
-    code: "+1",
-    iso: "US",
-    name: "USA / Canada",
-    flag: "🇺🇸",
-    digits: 10,
-    placeholder: "202-555-0123",
-    formatDisplay: (d) =>
-      d.length <= 3 ? d : d.length <= 6 ? `${d.slice(0, 3)}-${d.slice(3)}` : `${d.slice(0, 3)}-${d.slice(3, 6)}-${d.slice(6, 10)}`,
-    validate: (d) => d.length === 10,
-  },
-  {
-    code: "+91",
-    iso: "IN",
-    name: "India",
-    flag: "🇮🇳",
-    digits: 10,
-    placeholder: "98765-43210",
-    formatDisplay: (d) => (d.length <= 5 ? d : `${d.slice(0, 5)}-${d.slice(5, 10)}`),
-    validate: (d) => d.length === 10,
-  },
-  {
-    code: "+93",
-    iso: "AF",
-    name: "Afghanistan",
-    flag: "🇦🇫",
-    digits: 9,
-    placeholder: "70-123-4567",
-    formatDisplay: (d) => (d.length <= 2 ? d : `${d.slice(0, 2)}-${d.slice(2, 9)}`),
-    validate: (d) => d.length === 9,
-  },
-  {
-    code: "+968",
-    iso: "OM",
-    name: "Oman",
-    flag: "🇴🇲",
-    digits: 8,
-    placeholder: "9123-4567",
-    formatDisplay: (d) => (d.length <= 4 ? d : `${d.slice(0, 4)}-${d.slice(4, 8)}`),
-    validate: (d) => d.length === 8,
-  },
-  {
-    code: "+974",
-    iso: "QA",
-    name: "Qatar",
-    flag: "🇶🇦",
-    digits: 8,
-    placeholder: "3312-3456",
-    formatDisplay: (d) => (d.length <= 4 ? d : `${d.slice(0, 4)}-${d.slice(4, 8)}`),
-    validate: (d) => d.length === 8,
-  },
-  {
-    code: "+965",
-    iso: "KW",
-    name: "Kuwait",
-    flag: "🇰🇼",
-    digits: 8,
-    placeholder: "9123-4567",
-    formatDisplay: (d) => (d.length <= 4 ? d : `${d.slice(0, 4)}-${d.slice(4, 8)}`),
-    validate: (d) => d.length === 8,
-  },
-  {
-    code: "+973",
-    iso: "BH",
-    name: "Bahrain",
-    flag: "🇧🇭",
-    digits: 8,
-    placeholder: "3612-3456",
-    formatDisplay: (d) => (d.length <= 4 ? d : `${d.slice(0, 4)}-${d.slice(4, 8)}`),
-    validate: (d) => d.length === 8,
-  },
-  {
-    code: "+",
-    iso: "INTL",
-    name: "Other (International)",
-    flag: "🌐",
-    digits: 15,
-    placeholder: "Enter phone number",
-    formatDisplay: (d) => d,
-    validate: (d) => d.length >= 7,
-  },
-];
-
-export interface PhoneNumberInputProps {
-  value?: string;
-  onChange?: (value: string) => void;
-  onValidationChange?: (isValid: boolean) => void;
-  placeholder?: string;
-  disabled?: boolean;
-  required?: boolean;
-  id?: string;
-  name?: string;
-  className?: string;
-  error?: string;
-  showHelperText?: boolean;
-}
-
-/**
- * Parses initial string into country and raw local digits
- */
-export function parsePhoneValue(value: string | null | undefined): { countryCode: string; rawDigits: string } {
-  if (!value) return { countryCode: "+92", rawDigits: "" };
-
-  const trimmed = value.trim();
-  // Find matching country code prefix
-  for (const c of COUNTRIES) {
-    if (c.code !== "+" && trimmed.startsWith(c.code)) {
-      const remaining = trimmed.slice(c.code.length).replace(/\D/g, "");
-      return { countryCode: c.code, rawDigits: remaining.slice(0, c.digits) };
-    }
-  }
-
-  // Check if starts with 0 or plain digits (assume Pakistan)
-  const allDigits = trimmed.replace(/\D/g, "");
-  if (allDigits.startsWith("92") && allDigits.length > 10) {
-    return { countryCode: "+92", rawDigits: allDigits.slice(2, 12) };
-  }
-  if (allDigits.startsWith("0")) {
-    return { countryCode: "+92", rawDigits: allDigits.slice(1, 11) };
-  }
-  if (allDigits.length > 0) {
-    return { countryCode: "+92", rawDigits: allDigits.slice(0, 10) };
-  }
-
-  return { countryCode: "+92", rawDigits: "" };
-}
-
-export const PhoneNumberInput = React.forwardRef<HTMLInputElement, PhoneNumberInputProps>(
-  (
-    {
-      value = "",
-      onChange,
-      onValidationChange,
-      placeholder,
-      disabled = false,
-      required = false,
-      id,
-      name,
-      className = "",
-      error,
-      showHelperText = true,
-    },
-    ref
-  ) => {
-    const generatedId = useId();
-    const inputId = id || generatedId;
-
-    const parsed = useMemo(() => parsePhoneValue(value), [value]);
-
-    const [selectedCountryCode, setSelectedCountryCode] = useState<string>(parsed.countryCode);
-    const [rawDigits, setRawDigits] = useState<string>(parsed.rawDigits);
-    const [touched, setTouched] = useState<boolean>(false);
-
-    const activeCountry = useMemo(
-      () => COUNTRIES.find((c) => c.code === selectedCountryCode) || COUNTRIES[0],
-      [selectedCountryCode]
-    );
-
-    // Keep internal state in sync with external value without triggering loops
-    useEffect(() => {
-      const nextParsed = parsePhoneValue(value);
-      if (nextParsed.countryCode !== selectedCountryCode || nextParsed.rawDigits !== rawDigits) {
-        setSelectedCountryCode(nextParsed.countryCode);
-        setRawDigits(nextParsed.rawDigits);
-      }
-    }, [value]);
-
-    const isValid = useMemo(() => {
-      if (!rawDigits) return false;
-      return activeCountry.validate(rawDigits);
-    }, [rawDigits, activeCountry]);
-
-    const isInvalid = touched && rawDigits.length > 0 && !isValid;
-    const isRequiredEmpty = touched && required && rawDigits.length === 0;
-
-    useEffect(() => {
-      onValidationChange?.(isValid);
-    }, [isValid, onValidationChange]);
-
-    const handleCountryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-      const newCode = e.target.value;
-      setSelectedCountryCode(newCode);
-      const newCountry = COUNTRIES.find((c) => c.code === newCode) || COUNTRIES[0];
-
-      // Trim raw digits if exceeds new country max
-      const trimmedDigits = rawDigits.slice(0, newCountry.digits);
-      setRawDigits(trimmedDigits);
-
-      if (trimmedDigits.length > 0) {
-        onChange?.(`${newCode} ${trimmedDigits}`);
-      } else {
-        onChange?.("");
-      }
-    };
-
-    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-      const inputStr = e.target.value;
-
-      // Extract ONLY digits
-      let nextDigits = inputStr.replace(/\D/g, "");
-
-      // For Pakistan, auto-strip leading 0 if typed
-      if (activeCountry.code === "+92" && nextDigits.startsWith("0")) {
-        nextDigits = nextDigits.slice(1);
-      }
-
-      // Cap at active country max digits
-      nextDigits = nextDigits.slice(0, activeCountry.digits);
-
-      setRawDigits(nextDigits);
-
-      // Emit clean standardized output
-      if (nextDigits.length > 0) {
-        onChange?.(`${activeCountry.code} ${nextDigits}`);
-      } else {
-        onChange?.("");
-      }
-    };
-
-    const handleBlur = () => {
-      setTouched(true);
-    };
-
-    // Calculate display value purely from raw digits
-    const displayValue = activeCountry.formatDisplay(rawDigits);
-
-    // Dynamic styling
-    let statusClass = "border-input focus-within:ring-2 focus-within:ring-ring focus-within:border-primary";
-    if (error || isInvalid || isRequiredEmpty) {
-      statusClass = "border-destructive/80 focus-within:ring-2 focus-within:ring-destructive/30 bg-destructive/5";
-    } else if (isValid) {
-      statusClass = "border-emerald-500/80 focus-within:ring-2 focus-within:ring-emerald-500/30 bg-emerald-500/5";
-    }
-
-    return (
-      <div className={`flex flex-col gap-1 w-full ${className}`}>
-        <div
-          className={`flex items-center rounded-lg border bg-background overflow-hidden transition-all shadow-sm ${statusClass} ${
-            disabled ? "opacity-60 cursor-not-allowed" : ""
-          }`}
-        >
-          {/* Selectable Country Code Dropdown */}
-          <div className="relative flex items-center bg-muted/60 border-r border-input/60 select-none shrink-0 transition-colors hover:bg-muted/90">
-            <div className="flex items-center gap-1.5 px-3 py-2 text-sm font-semibold text-foreground/80 pointer-events-none">
-              <span>{activeCountry.flag}</span>
-              <span>{activeCountry.code}</span>
-              <ChevronDown className="h-3.5 w-3.5 opacity-50 ml-0.5" />
-            </div>
-            <select
-              value={selectedCountryCode}
-              onChange={handleCountryChange}
-              disabled={disabled}
-              aria-label="Select Country Code"
-              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
-            >
-              {COUNTRIES.map((c) => (
-                <option key={c.iso} value={c.code}>
-                  {c.flag} {c.name} ({c.code})
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Formatted Display Input */}
-          <input
-            ref={ref}
-            id={inputId}
-            name={name}
-            type="tel"
-            disabled={disabled}
-            required={required}
-            value={displayValue}
-            onChange={handleInputChange}
-            onBlur={handleBlur}
-            placeholder={placeholder || activeCountry.placeholder}
-            maxLength={activeCountry.digits + 4} // digits + formatting separators
-            className="w-full bg-transparent px-3 py-2 text-sm font-medium tracking-wide outline-none placeholder:text-muted-foreground/60 disabled:cursor-not-allowed"
-          />
-
-          {/* Status Indicator Feedback */}
-          <div className="pr-3 flex items-center justify-center shrink-0">
-            {isValid ? (
-              <div
-                className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 animate-in fade-in zoom-in-90 duration-200"
-                title={`Valid ${activeCountry.name} phone number`}
-              >
-                <CheckCircle2 className="h-4 w-4" />
-              </div>
-            ) : isInvalid ? (
-              <div
-                className="flex items-center gap-1 text-destructive animate-in fade-in duration-200"
-                title="Incomplete or invalid number"
-              >
-                <AlertCircle className="h-4 w-4" />
-              </div>
-            ) : rawDigits.length > 0 ? (
-              <span className="text-[11px] font-mono font-medium text-muted-foreground/70">
-                {rawDigits.length}/{activeCountry.digits}
-              </span>
-            ) : null}
-          </div>
-        </div>
-
-        {/* Inline Helper / Error Feedback */}
-        {showHelperText && (
-          <div className="flex items-center justify-between text-[11px] px-0.5">
-            {error || isInvalid ? (
-              <span className="text-destructive font-medium">
-                {error ||
-                  (rawDigits.length < activeCountry.digits
-                    ? `Enter ${activeCountry.digits} digits for ${activeCountry.name} (${
-                        activeCountry.digits - rawDigits.length
-                      } more needed)`
-                    : `Invalid format for ${activeCountry.name} (e.g. ${activeCountry.placeholder})`)}
-              </span>
-            ) : isRequiredEmpty ? (
-              <span className="text-destructive font-medium">Phone number is required</span>
-            ) : isValid ? (
-              <span className="text-emerald-600 dark:text-emerald-400 font-medium">
-                Valid {activeCountry.name} number
-              </span>
-            ) : (
-              <span className="text-muted-foreground/70">
-                Enter {activeCountry.digits}-digit number (e.g. {activeCountry.placeholder})
-              </span>
-            )}
-          </div>
-        )}
-      </div>
-    );
-  }
-);
-
-PhoneNumberInput.displayName = "PhoneNumberInput";
-
---- FILE: src/components/ui/popover.tsx ---
-"use client"
-
-import * as React from "react"
-import { Popover as PopoverPrimitive } from "@base-ui/react/popover"
-
-import { cn } from "@/lib/utils"
-
-function Popover({ ...props }: PopoverPrimitive.Root.Props) {
-  return <PopoverPrimitive.Root data-slot="popover" {...props} />
-}
-
-function PopoverTrigger({ ...props }: PopoverPrimitive.Trigger.Props) {
-  return <PopoverPrimitive.Trigger data-slot="popover-trigger" {...props} />
-}
-
-function PopoverContent({
-  className,
-  align = "center",
-  alignOffset = 0,
-  side = "bottom",
-  sideOffset = 4,
-  ...props
-}: PopoverPrimitive.Popup.Props &
-  Pick<
-    PopoverPrimitive.Positioner.Props,
-    "align" | "alignOffset" | "side" | "sideOffset"
-  >) {
-  return (
-    <PopoverPrimitive.Portal>
-      <PopoverPrimitive.Positioner
-        align={align}
-        alignOffset={alignOffset}
-        side={side}
-        sideOffset={sideOffset}
-        className="isolate z-50"
-      >
-        <PopoverPrimitive.Popup
-          data-slot="popover-content"
-          className={cn(
-            "z-50 flex w-72 origin-(--transform-origin) flex-col gap-2.5 rounded-lg bg-popover p-2.5 text-sm text-popover-foreground shadow-md ring-1 ring-foreground/10 outline-hidden duration-100 data-[side=bottom]:slide-in-from-top-2 data-[side=inline-end]:slide-in-from-left-2 data-[side=inline-start]:slide-in-from-right-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
-            className
-          )}
-          {...props}
-        />
-      </PopoverPrimitive.Positioner>
-    </PopoverPrimitive.Portal>
-  )
-}
-
-function PopoverHeader({ className, ...props }: React.ComponentProps<"div">) {
-  return (
-    <div
-      data-slot="popover-header"
-      className={cn("flex flex-col gap-0.5 text-sm", className)}
-      {...props}
-    />
-  )
-}
-
-function PopoverTitle({ className, ...props }: PopoverPrimitive.Title.Props) {
-  return (
-    <PopoverPrimitive.Title
-      data-slot="popover-title"
-      className={cn("font-medium", className)}
-      {...props}
-    />
-  )
-}
-
-function PopoverDescription({
-  className,
-  ...props
-}: PopoverPrimitive.Description.Props) {
-  return (
-    <PopoverPrimitive.Description
-      data-slot="popover-description"
-      className={cn("text-muted-foreground", className)}
-      {...props}
-    />
-  )
-}
-
-export {
-  Popover,
-  PopoverContent,
-  PopoverDescription,
-  PopoverHeader,
-  PopoverTitle,
-  PopoverTrigger,
-}
-
---- FILE: src/components/ui/scroll-area.tsx ---
-"use client"
-
-import * as React from "react"
-import { ScrollArea as ScrollAreaPrimitive } from "@base-ui/react/scroll-area"
-
-import { cn } from "@/lib/utils"
-
-function ScrollArea({
-  className,
-  children,
-  ...props
-}: ScrollAreaPrimitive.Root.Props) {
-  return (
-    <ScrollAreaPrimitive.Root
-      data-slot="scroll-area"
-      className={cn("relative", className)}
-      {...props}
-    >
-      <ScrollAreaPrimitive.Viewport
-        data-slot="scroll-area-viewport"
-        className="size-full rounded-[inherit] transition-[color,box-shadow] outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-1"
-      >
-        {children}
-      </ScrollAreaPrimitive.Viewport>
-      <ScrollBar />
-      <ScrollAreaPrimitive.Corner />
-    </ScrollAreaPrimitive.Root>
-  )
-}
-
-function ScrollBar({
-  className,
-  orientation = "vertical",
-  ...props
-}: ScrollAreaPrimitive.Scrollbar.Props) {
-  return (
-    <ScrollAreaPrimitive.Scrollbar
-      data-slot="scroll-area-scrollbar"
-      data-orientation={orientation}
-      orientation={orientation}
-      className={cn(
-        "flex touch-none p-px transition-colors select-none data-horizontal:h-2.5 data-horizontal:flex-col data-horizontal:border-t data-horizontal:border-t-transparent data-vertical:h-full data-vertical:w-2.5 data-vertical:border-l data-vertical:border-l-transparent",
-        className
-      )}
-      {...props}
-    >
-      <ScrollAreaPrimitive.Thumb
-        data-slot="scroll-area-thumb"
-        className="relative flex-1 rounded-full bg-border"
-      />
-    </ScrollAreaPrimitive.Scrollbar>
-  )
-}
-
-export { ScrollArea, ScrollBar }
-
---- FILE: src/components/ui/select.tsx ---
-"use client"
-
-import * as React from "react"
-import { Select as SelectPrimitive } from "@base-ui/react/select"
-
-import { cn } from "@/lib/utils"
-import { ChevronDownIcon, CheckIcon, ChevronUpIcon } from "lucide-react"
-
-const Select = SelectPrimitive.Root
-
-function SelectGroup({ className, ...props }: SelectPrimitive.Group.Props) {
-  return (
-    <SelectPrimitive.Group
-      data-slot="select-group"
-      className={cn("scroll-my-1 p-1", className)}
-      {...props}
-    />
-  )
-}
-
-function SelectValue({ className, ...props }: SelectPrimitive.Value.Props) {
-  return (
-    <SelectPrimitive.Value
-      data-slot="select-value"
-      className={cn("flex flex-1 text-left", className)}
-      {...props}
-    />
-  )
-}
-
-function SelectTrigger({
-  className,
-  size = "default",
-  children,
-  ...props
-}: SelectPrimitive.Trigger.Props & {
-  size?: "sm" | "default"
-}) {
-  return (
-    <SelectPrimitive.Trigger
-      data-slot="select-trigger"
-      data-size={size}
-      className={cn(
-        "flex w-fit items-center justify-between gap-1.5 rounded-lg border border-input bg-transparent py-2 pr-2 pl-2.5 text-sm whitespace-nowrap transition-colors outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 data-placeholder:text-muted-foreground data-[size=default]:h-8 data-[size=sm]:h-7 data-[size=sm]:rounded-[min(var(--radius-md),10px)] *:data-[slot=select-value]:line-clamp-1 *:data-[slot=select-value]:flex *:data-[slot=select-value]:items-center *:data-[slot=select-value]:gap-1.5 dark:bg-input/30 dark:hover:bg-input/50 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
-        className
-      )}
-      {...props}
-    >
-      {children}
-      <SelectPrimitive.Icon
-        render={
-          <ChevronDownIcon className="pointer-events-none size-4 text-muted-foreground" />
-        }
-      />
-    </SelectPrimitive.Trigger>
-  )
-}
-
-function SelectContent({
-  className,
-  children,
-  side = "bottom",
-  sideOffset = 4,
-  align = "center",
-  alignOffset = 0,
-  alignItemWithTrigger = true,
-  ...props
-}: SelectPrimitive.Popup.Props &
-  Pick<
-    SelectPrimitive.Positioner.Props,
-    "align" | "alignOffset" | "side" | "sideOffset" | "alignItemWithTrigger"
-  >) {
-  return (
-    <SelectPrimitive.Portal>
-      <SelectPrimitive.Positioner
-        side={side}
-        sideOffset={sideOffset}
-        align={align}
-        alignOffset={alignOffset}
-        alignItemWithTrigger={alignItemWithTrigger}
-        className="isolate z-50"
-      >
-        <SelectPrimitive.Popup
-          data-slot="select-content"
-          data-align-trigger={alignItemWithTrigger}
-          className={cn("relative isolate z-50 max-h-(--available-height) w-(--anchor-width) min-w-36 origin-(--transform-origin) overflow-x-hidden overflow-y-auto rounded-lg bg-popover text-popover-foreground shadow-md ring-1 ring-foreground/10 duration-100 data-[align-trigger=true]:animate-none data-[side=bottom]:slide-in-from-top-2 data-[side=inline-end]:slide-in-from-left-2 data-[side=inline-start]:slide-in-from-right-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95", className )}
-          {...props}
-        >
-          <SelectScrollUpButton />
-          <SelectPrimitive.List>{children}</SelectPrimitive.List>
-          <SelectScrollDownButton />
-        </SelectPrimitive.Popup>
-      </SelectPrimitive.Positioner>
-    </SelectPrimitive.Portal>
-  )
-}
-
-function SelectLabel({
-  className,
-  ...props
-}: SelectPrimitive.GroupLabel.Props) {
-  return (
-    <SelectPrimitive.GroupLabel
-      data-slot="select-label"
-      className={cn("px-1.5 py-1 text-xs text-muted-foreground", className)}
-      {...props}
-    />
-  )
-}
-
-function SelectItem({
-  className,
-  children,
-  ...props
-}: SelectPrimitive.Item.Props) {
-  return (
-    <SelectPrimitive.Item
-      data-slot="select-item"
-      className={cn(
-        "relative flex w-full cursor-default items-center gap-1.5 rounded-md py-1 pr-8 pl-1.5 text-sm outline-hidden select-none focus:bg-accent focus:text-accent-foreground not-data-[variant=destructive]:focus:**:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 *:[span]:last:flex *:[span]:last:items-center *:[span]:last:gap-2",
-        className
-      )}
-      {...props}
-    >
-      <SelectPrimitive.ItemText className="flex flex-1 shrink-0 gap-2 whitespace-nowrap">
-        {children}
-      </SelectPrimitive.ItemText>
-      <SelectPrimitive.ItemIndicator
-        render={
-          <span className="pointer-events-none absolute right-2 flex size-4 items-center justify-center" />
-        }
-      >
-        <CheckIcon className="pointer-events-none" />
-      </SelectPrimitive.ItemIndicator>
-    </SelectPrimitive.Item>
-  )
-}
-
-function SelectSeparator({
-  className,
-  ...props
-}: SelectPrimitive.Separator.Props) {
-  return (
-    <SelectPrimitive.Separator
-      data-slot="select-separator"
-      className={cn("pointer-events-none -mx-1 my-1 h-px bg-border", className)}
-      {...props}
-    />
-  )
-}
-
-function SelectScrollUpButton({
-  className,
-  ...props
-}: React.ComponentProps<typeof SelectPrimitive.ScrollUpArrow>) {
-  return (
-    <SelectPrimitive.ScrollUpArrow
-      data-slot="select-scroll-up-button"
-      className={cn(
-        "top-0 z-10 flex w-full cursor-default items-center justify-center bg-popover py-1 [&_svg:not([class*='size-'])]:size-4",
-        className
-      )}
-      {...props}
-    >
-      <ChevronUpIcon
-      />
-    </SelectPrimitive.ScrollUpArrow>
-  )
-}
-
-function SelectScrollDownButton({
-  className,
-  ...props
-}: React.ComponentProps<typeof SelectPrimitive.ScrollDownArrow>) {
-  return (
-    <SelectPrimitive.ScrollDownArrow
-      data-slot="select-scroll-down-button"
-      className={cn(
-        "bottom-0 z-10 flex w-full cursor-default items-center justify-center bg-popover py-1 [&_svg:not([class*='size-'])]:size-4",
-        className
-      )}
-      {...props}
-    >
-      <ChevronDownIcon
-      />
-    </SelectPrimitive.ScrollDownArrow>
-  )
-}
-
-export {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectScrollDownButton,
-  SelectScrollUpButton,
-  SelectSeparator,
-  SelectTrigger,
-  SelectValue,
-}
-
---- FILE: src/components/ui/separator.tsx ---
-"use client"
-
-import { Separator as SeparatorPrimitive } from "@base-ui/react/separator"
-
-import { cn } from "@/lib/utils"
-
-function Separator({
-  className,
-  orientation = "horizontal",
-  ...props
-}: SeparatorPrimitive.Props) {
-  return (
-    <SeparatorPrimitive
-      data-slot="separator"
-      orientation={orientation}
-      className={cn(
-        "shrink-0 bg-border data-horizontal:h-px data-horizontal:w-full data-vertical:w-px data-vertical:self-stretch",
-        className
-      )}
-      {...props}
-    />
-  )
-}
-
-export { Separator }
-
---- FILE: src/components/ui/sheet.tsx ---
-"use client"
-
-import * as React from "react"
-import { Dialog as SheetPrimitive } from "@base-ui/react/dialog"
-
-import { cn } from "@/lib/utils"
-import { Button } from "@/components/ui/button"
-import { XIcon } from "lucide-react"
-
-function Sheet({ ...props }: SheetPrimitive.Root.Props) {
-  return <SheetPrimitive.Root data-slot="sheet" {...props} />
-}
-
-function SheetTrigger({ ...props }: SheetPrimitive.Trigger.Props) {
-  return <SheetPrimitive.Trigger data-slot="sheet-trigger" {...props} />
-}
-
-function SheetClose({ ...props }: SheetPrimitive.Close.Props) {
-  return <SheetPrimitive.Close data-slot="sheet-close" {...props} />
-}
-
-function SheetPortal({ ...props }: SheetPrimitive.Portal.Props) {
-  return <SheetPrimitive.Portal data-slot="sheet-portal" {...props} />
-}
-
-function SheetOverlay({ className, ...props }: SheetPrimitive.Backdrop.Props) {
-  return (
-    <SheetPrimitive.Backdrop
-      data-slot="sheet-overlay"
-      className={cn(
-        "fixed inset-0 z-50 bg-black/10 transition-opacity duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0 supports-backdrop-filter:backdrop-blur-xs",
-        className
-      )}
-      {...props}
-    />
-  )
-}
-
-function SheetContent({
-  className,
-  children,
-  side = "right",
-  showCloseButton = true,
-  ...props
-}: SheetPrimitive.Popup.Props & {
-  side?: "top" | "right" | "bottom" | "left"
-  showCloseButton?: boolean
-}) {
-  return (
-    <SheetPortal>
-      <SheetOverlay />
-      <SheetPrimitive.Popup
-        data-slot="sheet-content"
-        data-side={side}
-        className={cn(
-          "fixed z-50 flex flex-col gap-4 bg-popover bg-clip-padding text-sm text-popover-foreground shadow-lg transition duration-200 ease-in-out data-ending-style:opacity-0 data-starting-style:opacity-0 data-[side=bottom]:inset-x-0 data-[side=bottom]:bottom-0 data-[side=bottom]:h-auto data-[side=bottom]:border-t data-[side=bottom]:data-ending-style:translate-y-[2.5rem] data-[side=bottom]:data-starting-style:translate-y-[2.5rem] data-[side=left]:inset-y-0 data-[side=left]:left-0 data-[side=left]:h-full data-[side=left]:w-3/4 data-[side=left]:border-r data-[side=left]:data-ending-style:translate-x-[-2.5rem] data-[side=left]:data-starting-style:translate-x-[-2.5rem] data-[side=right]:inset-y-0 data-[side=right]:right-0 data-[side=right]:h-full data-[side=right]:w-3/4 data-[side=right]:border-l data-[side=right]:data-ending-style:translate-x-[2.5rem] data-[side=right]:data-starting-style:translate-x-[2.5rem] data-[side=top]:inset-x-0 data-[side=top]:top-0 data-[side=top]:h-auto data-[side=top]:border-b data-[side=top]:data-ending-style:translate-y-[-2.5rem] data-[side=top]:data-starting-style:translate-y-[-2.5rem] data-[side=left]:sm:max-w-sm data-[side=right]:sm:max-w-sm",
-          className
-        )}
-        {...props}
-      >
-        {children}
-        {showCloseButton && (
-          <SheetPrimitive.Close
-            data-slot="sheet-close"
-            render={
-              <Button
-                variant="ghost"
-                className="absolute top-3 right-3"
-                size="icon-sm"
-              />
-            }
-          >
-            <XIcon
-            />
-            <span className="sr-only">Close</span>
-          </SheetPrimitive.Close>
-        )}
-      </SheetPrimitive.Popup>
-    </SheetPortal>
-  )
-}
-
-function SheetHeader({ className, ...props }: React.ComponentProps<"div">) {
-  return (
-    <div
-      data-slot="sheet-header"
-      className={cn("flex flex-col gap-0.5 p-4", className)}
-      {...props}
-    />
-  )
-}
-
-function SheetFooter({ className, ...props }: React.ComponentProps<"div">) {
-  return (
-    <div
-      data-slot="sheet-footer"
-      className={cn("mt-auto flex flex-col gap-2 p-4", className)}
-      {...props}
-    />
-  )
-}
-
-function SheetTitle({ className, ...props }: SheetPrimitive.Title.Props) {
-  return (
-    <SheetPrimitive.Title
-      data-slot="sheet-title"
-      className={cn(
-        "font-heading text-base font-medium text-foreground",
-        className
-      )}
-      {...props}
-    />
-  )
-}
-
-function SheetDescription({
-  className,
-  ...props
-}: SheetPrimitive.Description.Props) {
-  return (
-    <SheetPrimitive.Description
-      data-slot="sheet-description"
-      className={cn("text-sm text-muted-foreground", className)}
-      {...props}
-    />
-  )
-}
-
-export {
-  Sheet,
-  SheetTrigger,
-  SheetClose,
-  SheetContent,
-  SheetHeader,
-  SheetFooter,
-  SheetTitle,
-  SheetDescription,
-}
-
---- FILE: src/components/ui/switch.tsx ---
-"use client"
-
-import { Switch as SwitchPrimitive } from "@base-ui/react/switch"
-
-import { cn } from "@/lib/utils"
-
-function Switch({
-  className,
-  size = "default",
-  ...props
-}: SwitchPrimitive.Root.Props & {
-  size?: "sm" | "default"
-}) {
-  return (
-    <SwitchPrimitive.Root
-      data-slot="switch"
-      data-size={size}
-      className={cn(
-        "peer group/switch relative inline-flex shrink-0 items-center rounded-full border border-transparent transition-all outline-none after:absolute after:-inset-x-3 after:-inset-y-2 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 data-[size=default]:h-[18.4px] data-[size=default]:w-[32px] data-[size=sm]:h-[14px] data-[size=sm]:w-[24px] dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 data-checked:bg-primary data-unchecked:bg-input dark:data-unchecked:bg-input/80 data-disabled:cursor-not-allowed data-disabled:opacity-50",
-        className
-      )}
-      {...props}
-    >
-      <SwitchPrimitive.Thumb
-        data-slot="switch-thumb"
-        className="pointer-events-none block rounded-full bg-background ring-0 transition-transform group-data-[size=default]/switch:size-4 group-data-[size=sm]/switch:size-3 group-data-[size=default]/switch:data-checked:translate-x-[calc(100%-2px)] group-data-[size=sm]/switch:data-checked:translate-x-[calc(100%-2px)] dark:data-checked:bg-primary-foreground group-data-[size=default]/switch:data-unchecked:translate-x-0 group-data-[size=sm]/switch:data-unchecked:translate-x-0 dark:data-unchecked:bg-foreground"
-      />
-    </SwitchPrimitive.Root>
-  )
-}
-
-export { Switch }
-
---- FILE: src/components/ui/textarea.tsx ---
-import * as React from "react"
-
-import { cn } from "@/lib/utils"
-
-function Textarea({ className, ...props }: React.ComponentProps<"textarea">) {
-  return (
-    <textarea
-      data-slot="textarea"
-      className={cn(
-        "flex field-sizing-content min-h-16 w-full rounded-lg border border-input bg-transparent px-2.5 py-2 text-base transition-colors outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:bg-input/50 disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 md:text-sm dark:bg-input/30 dark:disabled:bg-input/80 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40",
-        className
-      )}
-      {...props}
-    />
-  )
-}
-
-export { Textarea }
-
---- FILE: src/components/ui/tooltip.tsx ---
-"use client"
-
-import { Tooltip as TooltipPrimitive } from "@base-ui/react/tooltip"
-
-import { cn } from "@/lib/utils"
-
-function TooltipProvider({
-  delay = 0,
-  ...props
-}: TooltipPrimitive.Provider.Props) {
-  return (
-    <TooltipPrimitive.Provider
-      data-slot="tooltip-provider"
-      delay={delay}
-      {...props}
-    />
-  )
-}
-
-function Tooltip({ ...props }: TooltipPrimitive.Root.Props) {
-  return <TooltipPrimitive.Root data-slot="tooltip" {...props} />
-}
-
-function TooltipTrigger({ ...props }: TooltipPrimitive.Trigger.Props) {
-  return <TooltipPrimitive.Trigger data-slot="tooltip-trigger" {...props} />
-}
-
-function TooltipContent({
-  className,
-  side = "top",
-  sideOffset = 4,
-  align = "center",
-  alignOffset = 0,
-  children,
-  ...props
-}: TooltipPrimitive.Popup.Props &
-  Pick<
-    TooltipPrimitive.Positioner.Props,
-    "align" | "alignOffset" | "side" | "sideOffset"
-  >) {
-  return (
-    <TooltipPrimitive.Portal>
-      <TooltipPrimitive.Positioner
-        align={align}
-        alignOffset={alignOffset}
-        side={side}
-        sideOffset={sideOffset}
-        className="isolate z-50"
-      >
-        <TooltipPrimitive.Popup
-          data-slot="tooltip-content"
-          className={cn(
-            "z-50 inline-flex w-fit max-w-xs origin-(--transform-origin) items-center gap-1.5 rounded-md bg-foreground px-3 py-1.5 text-xs text-background has-data-[slot=kbd]:pr-1.5 data-[side=bottom]:slide-in-from-top-2 data-[side=inline-end]:slide-in-from-left-2 data-[side=inline-start]:slide-in-from-right-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 **:data-[slot=kbd]:relative **:data-[slot=kbd]:isolate **:data-[slot=kbd]:z-50 **:data-[slot=kbd]:rounded-sm data-[state=delayed-open]:animate-in data-[state=delayed-open]:fade-in-0 data-[state=delayed-open]:zoom-in-95 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
-            className
-          )}
-          {...props}
-        >
-          {children}
-          <TooltipPrimitive.Arrow className="z-50 size-2.5 translate-y-[calc(-50%-2px)] rotate-45 rounded-[2px] bg-foreground fill-foreground data-[side=bottom]:top-1 data-[side=inline-end]:top-1/2! data-[side=inline-end]:-left-1 data-[side=inline-end]:-translate-y-1/2 data-[side=inline-start]:top-1/2! data-[side=inline-start]:-right-1 data-[side=inline-start]:-translate-y-1/2 data-[side=left]:top-1/2! data-[side=left]:-right-1 data-[side=left]:-translate-y-1/2 data-[side=right]:top-1/2! data-[side=right]:-left-1 data-[side=right]:-translate-y-1/2 data-[side=top]:-bottom-2.5" />
-        </TooltipPrimitive.Popup>
-      </TooltipPrimitive.Positioner>
-    </TooltipPrimitive.Portal>
-  )
-}
-
-export { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider }
 
 --- FILE: src/components/common/DeleteConfirmButton.tsx ---
 'use client'
@@ -8672,6 +6800,77 @@ export function DeleteConfirmButton({
       )}
     </>
   )
+}
+
+--- FILE: src/components/common/PdfActionButton.tsx ---
+"use client";
+
+import React, { useState } from "react";
+import { Loader2, Download, Printer, FileText } from "lucide-react";
+import { Button, ButtonProps } from "@/components/ui/button";
+import { downloadPdfFile, printPdfDirect } from "@/lib/client-pdf";
+
+interface PdfActionButtonProps extends Omit<ButtonProps, "onClick"> {
+  url: string;
+  filename?: string;
+  mode?: "download" | "print";
+  label?: string;
+  showIcon?: boolean;
+}
+
+export function PdfActionButton({
+  url,
+  filename = "document.pdf",
+  mode = "download",
+  label,
+  showIcon = true,
+  variant = "outline",
+  size = "sm",
+  className,
+  disabled,
+  children,
+  ...props
+}: PdfActionButtonProps) {
+  const [loading, setLoading] = useState(false);
+
+  const handleClick = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (loading || disabled) return;
+
+    setLoading(true);
+    try {
+      if (mode === "print") {
+        await printPdfDirect(url);
+      } else {
+        await downloadPdfFile(url, filename);
+      }
+    } catch (err: any) {
+      console.error("[PdfActionButton] Operation failed:", err);
+      alert(err.message || "Failed to process PDF.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const defaultIcon = () => {
+    if (loading) return <Loader2 className="h-4 w-4 animate-spin" />;
+    if (mode === "print") return <Printer className="h-4 w-4" />;
+    return <Download className="h-4 w-4" />;
+  };
+
+  return (
+    <Button
+      variant={variant}
+      size={size}
+      className={className}
+      disabled={disabled || loading}
+      onClick={handleClick}
+      {...props}
+    >
+      {showIcon && defaultIcon()}
+      {children || label || (mode === "print" ? "Print PDF" : "Download PDF")}
+    </Button>
+  );
 }
 
 --- FILE: src/components/dashboard/EarningsDashboardSection.tsx ---
@@ -8909,6 +7108,234 @@ export function EarningsDashboardSection({ initialData }: { initialData: Earning
       </CardContent>
     </Card>
   )
+}
+
+--- FILE: src/components/layout/NotificationDropdown.tsx ---
+"use client";
+
+import React, { useState, useEffect } from "react";
+import Link from "next/link";
+import {
+  Bell,
+  AlertTriangle,
+  AlertOctagon,
+  Info,
+  CheckCheck,
+  RefreshCw,
+  ExternalLink,
+  Package,
+} from "lucide-react";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Button } from "@/components/ui/button";
+import {
+  getSystemNotifications,
+  SystemNotificationItem,
+  markAllNotificationsAsRead,
+} from "@/app/actions/notification";
+
+export function NotificationDropdown() {
+  const [open, setOpen] = useState(false);
+  const [notifications, setNotifications] = useState<SystemNotificationItem[]>([]);
+  const [unreadCount, setUnreadCount] = useState<number>(0);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
+
+  const fetchNotifications = async () => {
+    try {
+      setLoading(true);
+      const res = await getSystemNotifications();
+      // Filter out locally dismissed
+      const filtered = res.notifications.filter((n) => !dismissedIds.has(n.id));
+      setNotifications(filtered);
+      setUnreadCount(filtered.length);
+    } catch (err) {
+      console.error("Failed to load notifications", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchNotifications();
+    const interval = setInterval(fetchNotifications, 60000); // Poll every 60s
+    return () => clearInterval(interval);
+  }, [dismissedIds]);
+
+  const handleClearAll = async () => {
+    await markAllNotificationsAsRead();
+    const allIds = new Set(notifications.map((n) => n.id));
+    setDismissedIds((prev) => new Set([...Array.from(prev), ...Array.from(allIds)]));
+    setNotifications([]);
+    setUnreadCount(0);
+  };
+
+  const handleDismiss = (id: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDismissedIds((prev) => new Set(prev).add(id));
+    setNotifications((prev) => {
+      const next = prev.filter((n) => n.id !== id);
+      setUnreadCount(next.length);
+      return next;
+    });
+  };
+
+  const getSeverityIcon = (type: SystemNotificationItem["type"], severity: SystemNotificationItem["severity"]) => {
+    if (type === "expired" || severity === "error") {
+      return (
+        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-destructive/10 text-destructive">
+          <AlertOctagon className="h-4 w-4" />
+        </div>
+      );
+    }
+    if (type === "expiring_soon" || type === "low_stock" || severity === "warning") {
+      return (
+        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400">
+          <AlertTriangle className="h-4 w-4" />
+        </div>
+      );
+    }
+    return (
+      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+        <Info className="h-4 w-4" />
+      </div>
+    );
+  };
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger
+        render={
+          <button
+            type="button"
+            className="relative inline-flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring transition-colors"
+            aria-label="View system notifications"
+          >
+            <Bell className="h-5 w-5" />
+            {unreadCount > 0 && (
+              <span className="absolute -top-1 -right-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-destructive-foreground shadow-sm animate-in zoom-in-50">
+                {unreadCount > 9 ? "9+" : unreadCount}
+              </span>
+            )}
+          </button>
+        }
+      />
+
+      <PopoverContent align="end" className="w-80 sm:w-96 p-0 shadow-lg">
+        {/* Header */}
+        <div className="flex items-center justify-between border-b px-4 py-3 bg-muted/30">
+          <div className="flex items-center gap-2">
+            <h4 className="text-sm font-semibold text-foreground">Notifications</h4>
+            {unreadCount > 0 && (
+              <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
+                {unreadCount} new
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              onClick={fetchNotifications}
+              disabled={loading}
+              title="Refresh notifications"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
+            </Button>
+            {unreadCount > 0 && (
+              <Button
+                variant="ghost"
+                size="xs"
+                onClick={handleClearAll}
+                className="text-xs text-muted-foreground hover:text-foreground h-7 px-2"
+              >
+                <CheckCheck className="h-3.5 w-3.5 mr-1" />
+                Clear
+              </Button>
+            )}
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className="max-h-[380px] overflow-y-auto divide-y">
+          {notifications.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-8 px-4 text-center">
+              <div className="rounded-full bg-emerald-500/10 p-3 mb-2 text-emerald-600 dark:text-emerald-400">
+                <Package className="h-6 w-6" />
+              </div>
+              <p className="text-sm font-medium text-foreground">All systems clear</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                No unread alerts. Medicines, stock, and batches are in good standing!
+              </p>
+            </div>
+          ) : (
+            notifications.map((item) => (
+              <div
+                key={item.id}
+                className={`p-3 transition-colors hover:bg-muted/40 flex items-start gap-3 text-left ${
+                  item.severity === "error"
+                    ? "bg-destructive/5"
+                    : item.severity === "warning"
+                    ? "bg-amber-500/5"
+                    : ""
+                }`}
+              >
+                {getSeverityIcon(item.type, item.severity)}
+
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-1">
+                    <p className="text-xs font-semibold text-foreground truncate">
+                      {item.title}
+                    </p>
+                    <button
+                      onClick={(e) => handleDismiss(item.id, e)}
+                      className="text-[10px] text-muted-foreground/60 hover:text-muted-foreground p-0.5"
+                      title="Dismiss"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2 leading-relaxed">
+                    {item.message}
+                  </p>
+
+                  {item.href && (
+                    <div className="mt-2">
+                      <Link
+                        href={item.href}
+                        onClick={() => setOpen(false)}
+                        className="inline-flex items-center gap-1 text-[11px] font-medium text-primary hover:underline"
+                      >
+                        View details
+                        <ExternalLink className="h-3 w-3" />
+                      </Link>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* Footer */}
+        {notifications.length > 0 && (
+          <div className="border-t p-2 text-center bg-muted/20">
+            <Link
+              href="/pharmacy/expiry-report"
+              onClick={() => setOpen(false)}
+              className="text-xs font-medium text-primary hover:underline"
+            >
+              Open Expiry & Stock Reports →
+            </Link>
+          </div>
+        )}
+      </PopoverContent>
+    </Popover>
+  );
 }
 
 --- FILE: src/components/layout/navbar.tsx ---
@@ -9267,234 +7694,6 @@ export function Sidebar({ className, userRole }: { className?: string; userRole?
         </nav>
       </ScrollArea>
     </div>
-  );
-}
-
---- FILE: src/components/layout/NotificationDropdown.tsx ---
-"use client";
-
-import React, { useState, useEffect } from "react";
-import Link from "next/link";
-import {
-  Bell,
-  AlertTriangle,
-  AlertOctagon,
-  Info,
-  CheckCheck,
-  RefreshCw,
-  ExternalLink,
-  Package,
-} from "lucide-react";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { Button } from "@/components/ui/button";
-import {
-  getSystemNotifications,
-  SystemNotificationItem,
-  markAllNotificationsAsRead,
-} from "@/app/actions/notification";
-
-export function NotificationDropdown() {
-  const [open, setOpen] = useState(false);
-  const [notifications, setNotifications] = useState<SystemNotificationItem[]>([]);
-  const [unreadCount, setUnreadCount] = useState<number>(0);
-  const [loading, setLoading] = useState<boolean>(false);
-  const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
-
-  const fetchNotifications = async () => {
-    try {
-      setLoading(true);
-      const res = await getSystemNotifications();
-      // Filter out locally dismissed
-      const filtered = res.notifications.filter((n) => !dismissedIds.has(n.id));
-      setNotifications(filtered);
-      setUnreadCount(filtered.length);
-    } catch (err) {
-      console.error("Failed to load notifications", err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchNotifications();
-    const interval = setInterval(fetchNotifications, 60000); // Poll every 60s
-    return () => clearInterval(interval);
-  }, [dismissedIds]);
-
-  const handleClearAll = async () => {
-    await markAllNotificationsAsRead();
-    const allIds = new Set(notifications.map((n) => n.id));
-    setDismissedIds((prev) => new Set([...Array.from(prev), ...Array.from(allIds)]));
-    setNotifications([]);
-    setUnreadCount(0);
-  };
-
-  const handleDismiss = (id: string, e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDismissedIds((prev) => new Set(prev).add(id));
-    setNotifications((prev) => {
-      const next = prev.filter((n) => n.id !== id);
-      setUnreadCount(next.length);
-      return next;
-    });
-  };
-
-  const getSeverityIcon = (type: SystemNotificationItem["type"], severity: SystemNotificationItem["severity"]) => {
-    if (type === "expired" || severity === "error") {
-      return (
-        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-destructive/10 text-destructive">
-          <AlertOctagon className="h-4 w-4" />
-        </div>
-      );
-    }
-    if (type === "expiring_soon" || type === "low_stock" || severity === "warning") {
-      return (
-        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400">
-          <AlertTriangle className="h-4 w-4" />
-        </div>
-      );
-    }
-    return (
-      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-        <Info className="h-4 w-4" />
-      </div>
-    );
-  };
-
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger
-        render={
-          <button
-            type="button"
-            className="relative inline-flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring transition-colors"
-            aria-label="View system notifications"
-          >
-            <Bell className="h-5 w-5" />
-            {unreadCount > 0 && (
-              <span className="absolute -top-1 -right-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-destructive-foreground shadow-sm animate-in zoom-in-50">
-                {unreadCount > 9 ? "9+" : unreadCount}
-              </span>
-            )}
-          </button>
-        }
-      />
-
-      <PopoverContent align="end" className="w-80 sm:w-96 p-0 shadow-lg">
-        {/* Header */}
-        <div className="flex items-center justify-between border-b px-4 py-3 bg-muted/30">
-          <div className="flex items-center gap-2">
-            <h4 className="text-sm font-semibold text-foreground">Notifications</h4>
-            {unreadCount > 0 && (
-              <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
-                {unreadCount} new
-              </span>
-            )}
-          </div>
-          <div className="flex items-center gap-1">
-            <Button
-              variant="ghost"
-              size="icon-xs"
-              onClick={fetchNotifications}
-              disabled={loading}
-              title="Refresh notifications"
-            >
-              <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
-            </Button>
-            {unreadCount > 0 && (
-              <Button
-                variant="ghost"
-                size="xs"
-                onClick={handleClearAll}
-                className="text-xs text-muted-foreground hover:text-foreground h-7 px-2"
-              >
-                <CheckCheck className="h-3.5 w-3.5 mr-1" />
-                Clear
-              </Button>
-            )}
-          </div>
-        </div>
-
-        {/* Content */}
-        <div className="max-h-[380px] overflow-y-auto divide-y">
-          {notifications.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-8 px-4 text-center">
-              <div className="rounded-full bg-emerald-500/10 p-3 mb-2 text-emerald-600 dark:text-emerald-400">
-                <Package className="h-6 w-6" />
-              </div>
-              <p className="text-sm font-medium text-foreground">All systems clear</p>
-              <p className="text-xs text-muted-foreground mt-1">
-                No unread alerts. Medicines, stock, and batches are in good standing!
-              </p>
-            </div>
-          ) : (
-            notifications.map((item) => (
-              <div
-                key={item.id}
-                className={`p-3 transition-colors hover:bg-muted/40 flex items-start gap-3 text-left ${
-                  item.severity === "error"
-                    ? "bg-destructive/5"
-                    : item.severity === "warning"
-                    ? "bg-amber-500/5"
-                    : ""
-                }`}
-              >
-                {getSeverityIcon(item.type, item.severity)}
-
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between gap-1">
-                    <p className="text-xs font-semibold text-foreground truncate">
-                      {item.title}
-                    </p>
-                    <button
-                      onClick={(e) => handleDismiss(item.id, e)}
-                      className="text-[10px] text-muted-foreground/60 hover:text-muted-foreground p-0.5"
-                      title="Dismiss"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2 leading-relaxed">
-                    {item.message}
-                  </p>
-
-                  {item.href && (
-                    <div className="mt-2">
-                      <Link
-                        href={item.href}
-                        onClick={() => setOpen(false)}
-                        className="inline-flex items-center gap-1 text-[11px] font-medium text-primary hover:underline"
-                      >
-                        View details
-                        <ExternalLink className="h-3 w-3" />
-                      </Link>
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-
-        {/* Footer */}
-        {notifications.length > 0 && (
-          <div className="border-t p-2 text-center bg-muted/20">
-            <Link
-              href="/pharmacy/expiry-report"
-              onClick={() => setOpen(false)}
-              className="text-xs font-medium text-primary hover:underline"
-            >
-              Open Expiry & Stock Reports →
-            </Link>
-          </div>
-        )}
-      </PopoverContent>
-    </Popover>
   );
 }
 
@@ -10954,6 +9153,2430 @@ export function PurchaseInvoicePDF({
     </Document>
   );
 }
+
+--- FILE: src/components/ui/avatar.tsx ---
+"use client"
+
+import * as React from "react"
+import { Avatar as AvatarPrimitive } from "@base-ui/react/avatar"
+
+import { cn } from "@/lib/utils"
+
+function Avatar({
+  className,
+  size = "default",
+  ...props
+}: AvatarPrimitive.Root.Props & {
+  size?: "default" | "sm" | "lg"
+}) {
+  return (
+    <AvatarPrimitive.Root
+      data-slot="avatar"
+      data-size={size}
+      className={cn(
+        "group/avatar relative flex size-8 shrink-0 rounded-full select-none after:absolute after:inset-0 after:rounded-full after:border after:border-border after:mix-blend-darken data-[size=lg]:size-10 data-[size=sm]:size-6 dark:after:mix-blend-lighten",
+        className
+      )}
+      {...props}
+    />
+  )
+}
+
+function AvatarImage({ className, ...props }: AvatarPrimitive.Image.Props) {
+  return (
+    <AvatarPrimitive.Image
+      data-slot="avatar-image"
+      className={cn(
+        "aspect-square size-full rounded-full object-cover",
+        className
+      )}
+      {...props}
+    />
+  )
+}
+
+function AvatarFallback({
+  className,
+  ...props
+}: AvatarPrimitive.Fallback.Props) {
+  return (
+    <AvatarPrimitive.Fallback
+      data-slot="avatar-fallback"
+      className={cn(
+        "flex size-full items-center justify-center rounded-full bg-muted text-sm text-muted-foreground group-data-[size=sm]/avatar:text-xs",
+        className
+      )}
+      {...props}
+    />
+  )
+}
+
+function AvatarBadge({ className, ...props }: React.ComponentProps<"span">) {
+  return (
+    <span
+      data-slot="avatar-badge"
+      className={cn(
+        "absolute right-0 bottom-0 z-10 inline-flex items-center justify-center rounded-full bg-primary text-primary-foreground bg-blend-color ring-2 ring-background select-none",
+        "group-data-[size=sm]/avatar:size-2 group-data-[size=sm]/avatar:[&>svg]:hidden",
+        "group-data-[size=default]/avatar:size-2.5 group-data-[size=default]/avatar:[&>svg]:size-2",
+        "group-data-[size=lg]/avatar:size-3 group-data-[size=lg]/avatar:[&>svg]:size-2",
+        className
+      )}
+      {...props}
+    />
+  )
+}
+
+function AvatarGroup({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="avatar-group"
+      className={cn(
+        "group/avatar-group flex -space-x-2 *:data-[slot=avatar]:ring-2 *:data-[slot=avatar]:ring-background",
+        className
+      )}
+      {...props}
+    />
+  )
+}
+
+function AvatarGroupCount({
+  className,
+  ...props
+}: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="avatar-group-count"
+      className={cn(
+        "relative flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-sm text-muted-foreground ring-2 ring-background group-has-data-[size=lg]/avatar-group:size-10 group-has-data-[size=sm]/avatar-group:size-6 [&>svg]:size-4 group-has-data-[size=lg]/avatar-group:[&>svg]:size-5 group-has-data-[size=sm]/avatar-group:[&>svg]:size-3",
+        className
+      )}
+      {...props}
+    />
+  )
+}
+
+export {
+  Avatar,
+  AvatarImage,
+  AvatarFallback,
+  AvatarGroup,
+  AvatarGroupCount,
+  AvatarBadge,
+}
+
+--- FILE: src/components/ui/badge.tsx ---
+import { mergeProps } from "@base-ui/react/merge-props"
+import { useRender } from "@base-ui/react/use-render"
+import { cva, type VariantProps } from "class-variance-authority"
+
+import { cn } from "@/lib/utils"
+
+const badgeVariants = cva(
+  "group/badge inline-flex h-5 w-fit shrink-0 items-center justify-center gap-1 overflow-hidden rounded-4xl border border-transparent px-2 py-0.5 text-xs font-medium whitespace-nowrap transition-all focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 [&>svg]:pointer-events-none [&>svg]:size-3!",
+  {
+    variants: {
+      variant: {
+        default: "bg-primary text-primary-foreground [a]:hover:bg-primary/80",
+        secondary:
+          "bg-secondary text-secondary-foreground [a]:hover:bg-secondary/80",
+        destructive:
+          "bg-destructive/10 text-destructive focus-visible:ring-destructive/20 dark:bg-destructive/20 dark:focus-visible:ring-destructive/40 [a]:hover:bg-destructive/20",
+        outline:
+          "border-border text-foreground [a]:hover:bg-muted [a]:hover:text-muted-foreground",
+        ghost:
+          "hover:bg-muted hover:text-muted-foreground dark:hover:bg-muted/50",
+        link: "text-primary underline-offset-4 hover:underline",
+      },
+    },
+    defaultVariants: {
+      variant: "default",
+    },
+  }
+)
+
+function Badge({
+  className,
+  variant = "default",
+  render,
+  ...props
+}: useRender.ComponentProps<"span"> & VariantProps<typeof badgeVariants>) {
+  return useRender({
+    defaultTagName: "span",
+    props: mergeProps<"span">(
+      {
+        className: cn(badgeVariants({ variant }), className),
+      },
+      props
+    ),
+    render,
+    state: {
+      slot: "badge",
+      variant,
+    },
+  })
+}
+
+export { Badge, badgeVariants }
+
+--- FILE: src/components/ui/button.tsx ---
+import { Button as ButtonPrimitive } from "@base-ui/react/button"
+import { cva, type VariantProps } from "class-variance-authority"
+
+import { cn } from "@/lib/utils"
+
+const buttonVariants = cva(
+  "group/button inline-flex shrink-0 items-center justify-center rounded-lg border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  {
+    variants: {
+      variant: {
+        default: "bg-primary text-primary-foreground hover:bg-primary/80",
+        outline:
+          "border-border bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50",
+        secondary:
+          "bg-secondary text-secondary-foreground hover:bg-[color-mix(in_oklch,var(--secondary),var(--foreground)_5%)] aria-expanded:bg-secondary aria-expanded:text-secondary-foreground",
+        ghost:
+          "hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:hover:bg-muted/50",
+        destructive:
+          "bg-destructive/10 text-destructive hover:bg-destructive/20 focus-visible:border-destructive/40 focus-visible:ring-destructive/20 dark:bg-destructive/20 dark:hover:bg-destructive/30 dark:focus-visible:ring-destructive/40",
+        link: "text-primary underline-offset-4 hover:underline",
+      },
+      size: {
+        default:
+          "h-8 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2",
+        xs: "h-6 gap-1 rounded-[min(var(--radius-md),10px)] px-2 text-xs in-data-[slot=button-group]:rounded-lg has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*='size-'])]:size-3",
+        sm: "h-7 gap-1 rounded-[min(var(--radius-md),12px)] px-2.5 text-[0.8rem] in-data-[slot=button-group]:rounded-lg has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*='size-'])]:size-3.5",
+        lg: "h-9 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2",
+        icon: "size-8",
+        "icon-xs":
+          "size-6 rounded-[min(var(--radius-md),10px)] in-data-[slot=button-group]:rounded-lg [&_svg:not([class*='size-'])]:size-3",
+        "icon-sm":
+          "size-7 rounded-[min(var(--radius-md),12px)] in-data-[slot=button-group]:rounded-lg",
+        "icon-lg": "size-9",
+      },
+    },
+    defaultVariants: {
+      variant: "default",
+      size: "default",
+    },
+  }
+)
+
+function Button({
+  className,
+  variant = "default",
+  size = "default",
+  ...props
+}: ButtonPrimitive.Props & VariantProps<typeof buttonVariants>) {
+  return (
+    <ButtonPrimitive
+      data-slot="button"
+      className={cn(buttonVariants({ variant, size, className }))}
+      {...props}
+    />
+  )
+}
+
+export type ButtonProps = ButtonPrimitive.Props & VariantProps<typeof buttonVariants>;
+export { Button, buttonVariants }
+
+--- FILE: src/components/ui/calendar.tsx ---
+"use client"
+
+import * as React from "react"
+import {
+  DayPicker,
+  getDefaultClassNames,
+  type DayButton,
+  type Locale,
+} from "react-day-picker"
+
+import { cn } from "@/lib/utils"
+import { Button, buttonVariants } from "@/components/ui/button"
+import { ChevronLeftIcon, ChevronRightIcon, ChevronDownIcon } from "lucide-react"
+
+function Calendar({
+  className,
+  classNames,
+  showOutsideDays = true,
+  captionLayout = "label",
+  buttonVariant = "ghost",
+  locale,
+  formatters,
+  components,
+  ...props
+}: React.ComponentProps<typeof DayPicker> & {
+  buttonVariant?: React.ComponentProps<typeof Button>["variant"]
+}) {
+  const defaultClassNames = getDefaultClassNames()
+
+  return (
+    <DayPicker
+      showOutsideDays={showOutsideDays}
+      className={cn(
+        "group/calendar bg-background p-2 [--cell-radius:var(--radius-md)] [--cell-size:--spacing(7)] in-data-[slot=card-content]:bg-transparent in-data-[slot=popover-content]:bg-transparent",
+        String.raw`rtl:**:[.rdp-button\_next>svg]:rotate-180`,
+        String.raw`rtl:**:[.rdp-button\_previous>svg]:rotate-180`,
+        className
+      )}
+      captionLayout={captionLayout}
+      locale={locale}
+      formatters={{
+        formatMonthDropdown: (date) =>
+          date.toLocaleString(locale?.code, { month: "short" }),
+        ...formatters,
+      }}
+      classNames={{
+        root: cn("w-fit", defaultClassNames.root),
+        months: cn(
+          "relative flex flex-col gap-4 md:flex-row",
+          defaultClassNames.months
+        ),
+        month: cn("flex w-full flex-col gap-4", defaultClassNames.month),
+        nav: cn(
+          "absolute inset-x-0 top-0 flex w-full items-center justify-between gap-1",
+          defaultClassNames.nav
+        ),
+        button_previous: cn(
+          buttonVariants({ variant: buttonVariant }),
+          "size-(--cell-size) p-0 select-none aria-disabled:opacity-50",
+          defaultClassNames.button_previous
+        ),
+        button_next: cn(
+          buttonVariants({ variant: buttonVariant }),
+          "size-(--cell-size) p-0 select-none aria-disabled:opacity-50",
+          defaultClassNames.button_next
+        ),
+        month_caption: cn(
+          "flex h-(--cell-size) w-full items-center justify-center px-(--cell-size)",
+          defaultClassNames.month_caption
+        ),
+        dropdowns: cn(
+          "flex h-(--cell-size) w-full items-center justify-center gap-1.5 text-sm font-medium",
+          defaultClassNames.dropdowns
+        ),
+        dropdown_root: cn(
+          "relative rounded-(--cell-radius)",
+          defaultClassNames.dropdown_root
+        ),
+        dropdown: cn(
+          "absolute inset-0 bg-popover opacity-0",
+          defaultClassNames.dropdown
+        ),
+        caption_label: cn(
+          "font-medium select-none",
+          captionLayout === "label"
+            ? "text-sm"
+            : "flex items-center gap-1 rounded-(--cell-radius) text-sm [&>svg]:size-3.5 [&>svg]:text-muted-foreground",
+          defaultClassNames.caption_label
+        ),
+        month_grid: cn("w-full border-collapse", defaultClassNames.month_grid),
+        weekdays: cn("flex", defaultClassNames.weekdays),
+        weekday: cn(
+          "flex-1 rounded-(--cell-radius) text-[0.8rem] font-normal text-muted-foreground select-none",
+          defaultClassNames.weekday
+        ),
+        week: cn("mt-2 flex w-full", defaultClassNames.week),
+        week_number_header: cn(
+          "w-(--cell-size) select-none",
+          defaultClassNames.week_number_header
+        ),
+        week_number: cn(
+          "text-[0.8rem] text-muted-foreground select-none",
+          defaultClassNames.week_number
+        ),
+        day: cn(
+          "group/day relative aspect-square h-full w-full rounded-(--cell-radius) p-0 text-center select-none [&:last-child[data-selected=true]_button]:rounded-r-(--cell-radius)",
+          props.showWeekNumber
+            ? "[&:nth-child(2)[data-selected=true]_button]:rounded-l-(--cell-radius)"
+            : "[&:first-child[data-selected=true]_button]:rounded-l-(--cell-radius)",
+          defaultClassNames.day
+        ),
+        range_start: cn(
+          "relative isolate z-0 rounded-l-(--cell-radius) bg-muted after:absolute after:inset-y-0 after:right-0 after:w-4 after:bg-muted",
+          defaultClassNames.range_start
+        ),
+        range_middle: cn("rounded-none", defaultClassNames.range_middle),
+        range_end: cn(
+          "relative isolate z-0 rounded-r-(--cell-radius) bg-muted after:absolute after:inset-y-0 after:left-0 after:w-4 after:bg-muted",
+          defaultClassNames.range_end
+        ),
+        today: cn(
+          "rounded-(--cell-radius) bg-muted text-foreground data-[selected=true]:rounded-none",
+          defaultClassNames.today
+        ),
+        outside: cn(
+          "text-muted-foreground aria-selected:text-muted-foreground",
+          defaultClassNames.outside
+        ),
+        disabled: cn(
+          "text-muted-foreground opacity-50",
+          defaultClassNames.disabled
+        ),
+        hidden: cn("invisible", defaultClassNames.hidden),
+        ...classNames,
+      }}
+      components={{
+        Root: ({ className, rootRef, ...props }) => {
+          return (
+            <div
+              data-slot="calendar"
+              ref={rootRef}
+              className={cn(className)}
+              {...props}
+            />
+          )
+        },
+        Chevron: ({ className, orientation, ...props }) => {
+          if (orientation === "left") {
+            return (
+              <ChevronLeftIcon className={cn("size-4", className)} {...props} />
+            )
+          }
+
+          if (orientation === "right") {
+            return (
+              <ChevronRightIcon className={cn("size-4", className)} {...props} />
+            )
+          }
+
+          return (
+            <ChevronDownIcon className={cn("size-4", className)} {...props} />
+          )
+        },
+        DayButton: ({ ...props }) => (
+          <CalendarDayButton locale={locale} {...props} />
+        ),
+        WeekNumber: ({ children, ...props }) => {
+          return (
+            <td {...props}>
+              <div className="flex size-(--cell-size) items-center justify-center text-center">
+                {children}
+              </div>
+            </td>
+          )
+        },
+        ...components,
+      }}
+      {...props}
+    />
+  )
+}
+
+function CalendarDayButton({
+  className,
+  day,
+  modifiers,
+  locale,
+  ...props
+}: React.ComponentProps<typeof DayButton> & { locale?: Partial<Locale> }) {
+  const defaultClassNames = getDefaultClassNames()
+
+  const ref = React.useRef<HTMLButtonElement>(null)
+  React.useEffect(() => {
+    if (modifiers.focused) ref.current?.focus()
+  }, [modifiers.focused])
+
+  return (
+    <Button
+      variant="ghost"
+      size="icon"
+      data-day={day.date.toLocaleDateString(locale?.code)}
+      data-selected-single={
+        modifiers.selected &&
+        !modifiers.range_start &&
+        !modifiers.range_end &&
+        !modifiers.range_middle
+      }
+      data-range-start={modifiers.range_start}
+      data-range-end={modifiers.range_end}
+      data-range-middle={modifiers.range_middle}
+      className={cn(
+        "relative isolate z-10 flex aspect-square size-auto w-full min-w-(--cell-size) flex-col gap-1 border-0 leading-none font-normal group-data-[focused=true]/day:relative group-data-[focused=true]/day:z-10 group-data-[focused=true]/day:border-ring group-data-[focused=true]/day:ring-[3px] group-data-[focused=true]/day:ring-ring/50 data-[range-end=true]:rounded-(--cell-radius) data-[range-end=true]:rounded-r-(--cell-radius) data-[range-end=true]:bg-primary data-[range-end=true]:text-primary-foreground data-[range-middle=true]:rounded-none data-[range-middle=true]:bg-muted data-[range-middle=true]:text-foreground data-[range-start=true]:rounded-(--cell-radius) data-[range-start=true]:rounded-l-(--cell-radius) data-[range-start=true]:bg-primary data-[range-start=true]:text-primary-foreground data-[selected-single=true]:bg-primary data-[selected-single=true]:text-primary-foreground dark:hover:text-foreground [&>span]:text-xs [&>span]:opacity-70",
+        defaultClassNames.day,
+        className
+      )}
+      {...props}
+    />
+  )
+}
+
+export { Calendar, CalendarDayButton }
+
+--- FILE: src/components/ui/card.tsx ---
+import * as React from "react"
+
+import { cn } from "@/lib/utils"
+
+function Card({
+  className,
+  size = "default",
+  ...props
+}: React.ComponentProps<"div"> & { size?: "default" | "sm" }) {
+  return (
+    <div
+      data-slot="card"
+      data-size={size}
+      className={cn(
+        "group/card flex flex-col gap-(--card-spacing) overflow-hidden rounded-xl bg-card py-(--card-spacing) text-sm text-card-foreground ring-1 ring-foreground/10 [--card-spacing:--spacing(4)] has-data-[slot=card-footer]:pb-0 has-[>img:first-child]:pt-0 data-[size=sm]:[--card-spacing:--spacing(3)] data-[size=sm]:has-data-[slot=card-footer]:pb-0 *:[img:first-child]:rounded-t-xl *:[img:last-child]:rounded-b-xl",
+        className
+      )}
+      {...props}
+    />
+  )
+}
+
+function CardHeader({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="card-header"
+      className={cn(
+        "group/card-header @container/card-header grid auto-rows-min items-start gap-1 rounded-t-xl px-(--card-spacing) has-data-[slot=card-action]:grid-cols-[1fr_auto] has-data-[slot=card-description]:grid-rows-[auto_auto] [.border-b]:pb-(--card-spacing)",
+        className
+      )}
+      {...props}
+    />
+  )
+}
+
+function CardTitle({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="card-title"
+      className={cn(
+        "text-base leading-snug font-medium group-data-[size=sm]/card:text-sm",
+        className
+      )}
+      {...props}
+    />
+  )
+}
+
+function CardDescription({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="card-description"
+      className={cn("text-sm text-muted-foreground", className)}
+      {...props}
+    />
+  )
+}
+
+function CardAction({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="card-action"
+      className={cn(
+        "col-start-2 row-span-2 row-start-1 self-start justify-self-end",
+        className
+      )}
+      {...props}
+    />
+  )
+}
+
+function CardContent({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="card-content"
+      className={cn("px-(--card-spacing)", className)}
+      {...props}
+    />
+  )
+}
+
+function CardFooter({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="card-footer"
+      className={cn(
+        "flex items-center rounded-b-xl border-t bg-muted/50 p-(--card-spacing)",
+        className
+      )}
+      {...props}
+    />
+  )
+}
+
+export {
+  Card,
+  CardHeader,
+  CardFooter,
+  CardTitle,
+  CardAction,
+  CardDescription,
+  CardContent,
+}
+
+--- FILE: src/components/ui/command.tsx ---
+"use client"
+
+import * as React from "react"
+import { Command as CommandPrimitive } from "cmdk"
+
+import { cn } from "@/lib/utils"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import {
+  InputGroup,
+  InputGroupAddon,
+} from "@/components/ui/input-group"
+import { SearchIcon, CheckIcon } from "lucide-react"
+
+function Command({
+  className,
+  ...props
+}: React.ComponentProps<typeof CommandPrimitive>) {
+  return (
+    <CommandPrimitive
+      data-slot="command"
+      className={cn(
+        "flex size-full flex-col overflow-hidden rounded-xl! bg-popover p-1 text-popover-foreground",
+        className
+      )}
+      {...props}
+    />
+  )
+}
+
+function CommandDialog({
+  title = "Command Palette",
+  description = "Search for a command to run...",
+  children,
+  className,
+  showCloseButton = false,
+  ...props
+}: Omit<React.ComponentProps<typeof Dialog>, "children"> & {
+  title?: string
+  description?: string
+  className?: string
+  showCloseButton?: boolean
+  children: React.ReactNode
+}) {
+  return (
+    <Dialog {...props}>
+      <DialogHeader className="sr-only">
+        <DialogTitle>{title}</DialogTitle>
+        <DialogDescription>{description}</DialogDescription>
+      </DialogHeader>
+      <DialogContent
+        className={cn(
+          "top-1/3 translate-y-0 overflow-hidden rounded-xl! p-0",
+          className
+        )}
+        showCloseButton={showCloseButton}
+      >
+        {children}
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function CommandInput({
+  className,
+  ...props
+}: React.ComponentProps<typeof CommandPrimitive.Input>) {
+  return (
+    <div data-slot="command-input-wrapper" className="p-1 pb-0">
+      <InputGroup className="h-8! rounded-lg! border-input/30 bg-input/30 shadow-none! *:data-[slot=input-group-addon]:pl-2!">
+        <CommandPrimitive.Input
+          data-slot="command-input"
+          className={cn(
+            "w-full text-sm outline-hidden disabled:cursor-not-allowed disabled:opacity-50",
+            className
+          )}
+          {...props}
+        />
+        <InputGroupAddon>
+          <SearchIcon className="size-4 shrink-0 opacity-50" />
+        </InputGroupAddon>
+      </InputGroup>
+    </div>
+  )
+}
+
+function CommandList({
+  className,
+  ...props
+}: React.ComponentProps<typeof CommandPrimitive.List>) {
+  return (
+    <CommandPrimitive.List
+      data-slot="command-list"
+      className={cn(
+        "no-scrollbar max-h-72 scroll-py-1 overflow-x-hidden overflow-y-auto outline-none",
+        className
+      )}
+      {...props}
+    />
+  )
+}
+
+function CommandEmpty({
+  className,
+  ...props
+}: React.ComponentProps<typeof CommandPrimitive.Empty>) {
+  return (
+    <CommandPrimitive.Empty
+      data-slot="command-empty"
+      className={cn("py-6 text-center text-sm", className)}
+      {...props}
+    />
+  )
+}
+
+function CommandGroup({
+  className,
+  ...props
+}: React.ComponentProps<typeof CommandPrimitive.Group>) {
+  return (
+    <CommandPrimitive.Group
+      data-slot="command-group"
+      className={cn(
+        "overflow-hidden p-1 text-foreground **:[[cmdk-group-heading]]:px-2 **:[[cmdk-group-heading]]:py-1.5 **:[[cmdk-group-heading]]:text-xs **:[[cmdk-group-heading]]:font-medium **:[[cmdk-group-heading]]:text-muted-foreground",
+        className
+      )}
+      {...props}
+    />
+  )
+}
+
+function CommandSeparator({
+  className,
+  ...props
+}: React.ComponentProps<typeof CommandPrimitive.Separator>) {
+  return (
+    <CommandPrimitive.Separator
+      data-slot="command-separator"
+      className={cn("-mx-1 h-px bg-border", className)}
+      {...props}
+    />
+  )
+}
+
+function CommandItem({
+  className,
+  children,
+  ...props
+}: React.ComponentProps<typeof CommandPrimitive.Item>) {
+  return (
+    <CommandPrimitive.Item
+      data-slot="command-item"
+      className={cn(
+        "group/command-item relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-hidden select-none in-data-[slot=dialog-content]:rounded-lg! data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50 data-selected:bg-muted data-selected:text-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 data-selected:*:[svg]:text-foreground",
+        className
+      )}
+      {...props}
+    >
+      {children}
+      <CheckIcon className="ml-auto opacity-0 group-has-data-[slot=command-shortcut]/command-item:hidden group-data-[checked=true]/command-item:opacity-100" />
+    </CommandPrimitive.Item>
+  )
+}
+
+function CommandShortcut({
+  className,
+  ...props
+}: React.ComponentProps<"span">) {
+  return (
+    <span
+      data-slot="command-shortcut"
+      className={cn(
+        "ml-auto text-xs tracking-widest text-muted-foreground group-data-selected/command-item:text-foreground",
+        className
+      )}
+      {...props}
+    />
+  )
+}
+
+export {
+  Command,
+  CommandDialog,
+  CommandInput,
+  CommandList,
+  CommandEmpty,
+  CommandGroup,
+  CommandItem,
+  CommandShortcut,
+  CommandSeparator,
+}
+
+--- FILE: src/components/ui/dialog.tsx ---
+"use client"
+
+import * as React from "react"
+import { Dialog as DialogPrimitive } from "@base-ui/react/dialog"
+
+import { cn } from "@/lib/utils"
+import { Button } from "@/components/ui/button"
+import { XIcon } from "lucide-react"
+
+function Dialog({ ...props }: DialogPrimitive.Root.Props) {
+  return <DialogPrimitive.Root data-slot="dialog" {...props} />
+}
+
+function DialogTrigger({ ...props }: DialogPrimitive.Trigger.Props) {
+  return <DialogPrimitive.Trigger data-slot="dialog-trigger" {...props} />
+}
+
+function DialogPortal({ ...props }: DialogPrimitive.Portal.Props) {
+  return <DialogPrimitive.Portal data-slot="dialog-portal" {...props} />
+}
+
+function DialogClose({ ...props }: DialogPrimitive.Close.Props) {
+  return <DialogPrimitive.Close data-slot="dialog-close" {...props} />
+}
+
+function DialogOverlay({
+  className,
+  ...props
+}: DialogPrimitive.Backdrop.Props) {
+  return (
+    <DialogPrimitive.Backdrop
+      data-slot="dialog-overlay"
+      className={cn(
+        "fixed inset-0 isolate z-50 bg-black/10 duration-100 supports-backdrop-filter:backdrop-blur-xs data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0",
+        className
+      )}
+      {...props}
+    />
+  )
+}
+
+function DialogContent({
+  className,
+  children,
+  showCloseButton = true,
+  ...props
+}: DialogPrimitive.Popup.Props & {
+  showCloseButton?: boolean
+}) {
+  return (
+    <DialogPortal>
+      <DialogOverlay />
+      <DialogPrimitive.Popup
+        data-slot="dialog-content"
+        className={cn(
+          "fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl bg-popover p-4 text-sm text-popover-foreground ring-1 ring-foreground/10 duration-100 outline-none sm:max-w-sm data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
+          className
+        )}
+        {...props}
+      >
+        {children}
+        {showCloseButton && (
+          <DialogPrimitive.Close
+            data-slot="dialog-close"
+            render={
+              <Button
+                variant="ghost"
+                className="absolute top-2 right-2"
+                size="icon-sm"
+              />
+            }
+          >
+            <XIcon
+            />
+            <span className="sr-only">Close</span>
+          </DialogPrimitive.Close>
+        )}
+      </DialogPrimitive.Popup>
+    </DialogPortal>
+  )
+}
+
+function DialogHeader({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="dialog-header"
+      className={cn("flex flex-col gap-2", className)}
+      {...props}
+    />
+  )
+}
+
+function DialogFooter({
+  className,
+  showCloseButton = false,
+  children,
+  ...props
+}: React.ComponentProps<"div"> & {
+  showCloseButton?: boolean
+}) {
+  return (
+    <div
+      data-slot="dialog-footer"
+      className={cn(
+        "-mx-4 -mb-4 flex flex-col-reverse gap-2 rounded-b-xl border-t bg-muted/50 p-4 sm:flex-row sm:justify-end",
+        className
+      )}
+      {...props}
+    >
+      {children}
+      {showCloseButton && (
+        <DialogPrimitive.Close render={<Button variant="outline" />}>
+          Close
+        </DialogPrimitive.Close>
+      )}
+    </div>
+  )
+}
+
+function DialogTitle({ className, ...props }: DialogPrimitive.Title.Props) {
+  return (
+    <DialogPrimitive.Title
+      data-slot="dialog-title"
+      className={cn(
+        "text-base leading-none font-medium",
+        className
+      )}
+      {...props}
+    />
+  )
+}
+
+function DialogDescription({
+  className,
+  ...props
+}: DialogPrimitive.Description.Props) {
+  return (
+    <DialogPrimitive.Description
+      data-slot="dialog-description"
+      className={cn(
+        "text-sm text-muted-foreground *:[a]:underline *:[a]:underline-offset-3 *:[a]:hover:text-foreground",
+        className
+      )}
+      {...props}
+    />
+  )
+}
+
+export {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogOverlay,
+  DialogPortal,
+  DialogTitle,
+  DialogTrigger,
+}
+
+--- FILE: src/components/ui/dropdown-menu.tsx ---
+"use client"
+
+import * as React from "react"
+import { Menu as MenuPrimitive } from "@base-ui/react/menu"
+
+import { cn } from "@/lib/utils"
+import { ChevronRightIcon, CheckIcon } from "lucide-react"
+
+function DropdownMenu({ ...props }: MenuPrimitive.Root.Props) {
+  return <MenuPrimitive.Root data-slot="dropdown-menu" {...props} />
+}
+
+function DropdownMenuPortal({ ...props }: MenuPrimitive.Portal.Props) {
+  return <MenuPrimitive.Portal data-slot="dropdown-menu-portal" {...props} />
+}
+
+function DropdownMenuTrigger({ ...props }: MenuPrimitive.Trigger.Props) {
+  return <MenuPrimitive.Trigger data-slot="dropdown-menu-trigger" {...props} />
+}
+
+function DropdownMenuContent({
+  align = "start",
+  alignOffset = 0,
+  side = "bottom",
+  sideOffset = 4,
+  className,
+  ...props
+}: MenuPrimitive.Popup.Props &
+  Pick<
+    MenuPrimitive.Positioner.Props,
+    "align" | "alignOffset" | "side" | "sideOffset"
+  >) {
+  return (
+    <MenuPrimitive.Portal>
+      <MenuPrimitive.Positioner
+        className="isolate z-50 outline-none"
+        align={align}
+        alignOffset={alignOffset}
+        side={side}
+        sideOffset={sideOffset}
+      >
+        <MenuPrimitive.Popup
+          data-slot="dropdown-menu-content"
+          className={cn("z-50 max-h-(--available-height) w-(--anchor-width) min-w-32 origin-(--transform-origin) overflow-x-hidden overflow-y-auto rounded-lg bg-popover p-1 text-popover-foreground shadow-md ring-1 ring-foreground/10 duration-100 outline-none data-[side=bottom]:slide-in-from-top-2 data-[side=inline-end]:slide-in-from-left-2 data-[side=inline-start]:slide-in-from-right-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:overflow-hidden data-closed:fade-out-0 data-closed:zoom-out-95", className )}
+          {...props}
+        />
+      </MenuPrimitive.Positioner>
+    </MenuPrimitive.Portal>
+  )
+}
+
+function DropdownMenuGroup({ ...props }: MenuPrimitive.Group.Props) {
+  return <MenuPrimitive.Group data-slot="dropdown-menu-group" {...props} />
+}
+
+function DropdownMenuLabel({
+  className,
+  inset,
+  ...props
+}: MenuPrimitive.GroupLabel.Props & {
+  inset?: boolean
+}) {
+  return (
+    <MenuPrimitive.GroupLabel
+      data-slot="dropdown-menu-label"
+      data-inset={inset}
+      className={cn(
+        "px-1.5 py-1 text-xs font-medium text-muted-foreground data-inset:pl-7",
+        className
+      )}
+      {...props}
+    />
+  )
+}
+
+function DropdownMenuItem({
+  className,
+  inset,
+  variant = "default",
+  ...props
+}: MenuPrimitive.Item.Props & {
+  inset?: boolean
+  variant?: "default" | "destructive"
+}) {
+  return (
+    <MenuPrimitive.Item
+      data-slot="dropdown-menu-item"
+      data-inset={inset}
+      data-variant={variant}
+      className={cn(
+        "group/dropdown-menu-item relative flex cursor-default items-center gap-1.5 rounded-md px-1.5 py-1 text-sm outline-hidden select-none focus:bg-accent focus:text-accent-foreground not-data-[variant=destructive]:focus:**:text-accent-foreground data-inset:pl-7 data-[variant=destructive]:text-destructive data-[variant=destructive]:focus:bg-destructive/10 data-[variant=destructive]:focus:text-destructive dark:data-[variant=destructive]:focus:bg-destructive/20 data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 data-[variant=destructive]:*:[svg]:text-destructive",
+        className
+      )}
+      {...props}
+    />
+  )
+}
+
+function DropdownMenuSub({ ...props }: MenuPrimitive.SubmenuRoot.Props) {
+  return <MenuPrimitive.SubmenuRoot data-slot="dropdown-menu-sub" {...props} />
+}
+
+function DropdownMenuSubTrigger({
+  className,
+  inset,
+  children,
+  ...props
+}: MenuPrimitive.SubmenuTrigger.Props & {
+  inset?: boolean
+}) {
+  return (
+    <MenuPrimitive.SubmenuTrigger
+      data-slot="dropdown-menu-sub-trigger"
+      data-inset={inset}
+      className={cn(
+        "flex cursor-default items-center gap-1.5 rounded-md px-1.5 py-1 text-sm outline-hidden select-none focus:bg-accent focus:text-accent-foreground not-data-[variant=destructive]:focus:**:text-accent-foreground data-inset:pl-7 data-popup-open:bg-accent data-popup-open:text-accent-foreground data-open:bg-accent data-open:text-accent-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+        className
+      )}
+      {...props}
+    >
+      {children}
+      <ChevronRightIcon className="ml-auto" />
+    </MenuPrimitive.SubmenuTrigger>
+  )
+}
+
+function DropdownMenuSubContent({
+  align = "start",
+  alignOffset = -3,
+  side = "right",
+  sideOffset = 0,
+  className,
+  ...props
+}: React.ComponentProps<typeof DropdownMenuContent>) {
+  return (
+    <DropdownMenuContent
+      data-slot="dropdown-menu-sub-content"
+      className={cn("w-auto min-w-[96px] rounded-lg bg-popover p-1 text-popover-foreground shadow-lg ring-1 ring-foreground/10 duration-100 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95", className )}
+      align={align}
+      alignOffset={alignOffset}
+      side={side}
+      sideOffset={sideOffset}
+      {...props}
+    />
+  )
+}
+
+function DropdownMenuCheckboxItem({
+  className,
+  children,
+  checked,
+  inset,
+  ...props
+}: MenuPrimitive.CheckboxItem.Props & {
+  inset?: boolean
+}) {
+  return (
+    <MenuPrimitive.CheckboxItem
+      data-slot="dropdown-menu-checkbox-item"
+      data-inset={inset}
+      className={cn(
+        "relative flex cursor-default items-center gap-1.5 rounded-md py-1 pr-8 pl-1.5 text-sm outline-hidden select-none focus:bg-accent focus:text-accent-foreground focus:**:text-accent-foreground data-inset:pl-7 data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+        className
+      )}
+      checked={checked}
+      {...props}
+    >
+      <span
+        className="pointer-events-none absolute right-2 flex items-center justify-center"
+        data-slot="dropdown-menu-checkbox-item-indicator"
+      >
+        <MenuPrimitive.CheckboxItemIndicator>
+          <CheckIcon
+          />
+        </MenuPrimitive.CheckboxItemIndicator>
+      </span>
+      {children}
+    </MenuPrimitive.CheckboxItem>
+  )
+}
+
+function DropdownMenuRadioGroup({ ...props }: MenuPrimitive.RadioGroup.Props) {
+  return (
+    <MenuPrimitive.RadioGroup
+      data-slot="dropdown-menu-radio-group"
+      {...props}
+    />
+  )
+}
+
+function DropdownMenuRadioItem({
+  className,
+  children,
+  inset,
+  ...props
+}: MenuPrimitive.RadioItem.Props & {
+  inset?: boolean
+}) {
+  return (
+    <MenuPrimitive.RadioItem
+      data-slot="dropdown-menu-radio-item"
+      data-inset={inset}
+      className={cn(
+        "relative flex cursor-default items-center gap-1.5 rounded-md py-1 pr-8 pl-1.5 text-sm outline-hidden select-none focus:bg-accent focus:text-accent-foreground focus:**:text-accent-foreground data-inset:pl-7 data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+        className
+      )}
+      {...props}
+    >
+      <span
+        className="pointer-events-none absolute right-2 flex items-center justify-center"
+        data-slot="dropdown-menu-radio-item-indicator"
+      >
+        <MenuPrimitive.RadioItemIndicator>
+          <CheckIcon
+          />
+        </MenuPrimitive.RadioItemIndicator>
+      </span>
+      {children}
+    </MenuPrimitive.RadioItem>
+  )
+}
+
+function DropdownMenuSeparator({
+  className,
+  ...props
+}: MenuPrimitive.Separator.Props) {
+  return (
+    <MenuPrimitive.Separator
+      data-slot="dropdown-menu-separator"
+      className={cn("-mx-1 my-1 h-px bg-border", className)}
+      {...props}
+    />
+  )
+}
+
+function DropdownMenuShortcut({
+  className,
+  ...props
+}: React.ComponentProps<"span">) {
+  return (
+    <span
+      data-slot="dropdown-menu-shortcut"
+      className={cn(
+        "ml-auto text-xs tracking-widest text-muted-foreground group-focus/dropdown-menu-item:text-accent-foreground",
+        className
+      )}
+      {...props}
+    />
+  )
+}
+
+export {
+  DropdownMenu,
+  DropdownMenuPortal,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuLabel,
+  DropdownMenuItem,
+  DropdownMenuCheckboxItem,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuShortcut,
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
+  DropdownMenuSubContent,
+}
+
+--- FILE: src/components/ui/input-group.tsx ---
+"use client"
+
+import * as React from "react"
+import { cva, type VariantProps } from "class-variance-authority"
+
+import { cn } from "@/lib/utils"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
+
+function InputGroup({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="input-group"
+      role="group"
+      className={cn(
+        "group/input-group relative flex h-8 w-full min-w-0 items-center rounded-lg border border-input transition-colors outline-none in-data-[slot=combobox-content]:focus-within:border-inherit in-data-[slot=combobox-content]:focus-within:ring-0 has-disabled:bg-input/50 has-disabled:opacity-50 has-[[data-slot=input-group-control]:focus-visible]:border-ring has-[[data-slot=input-group-control]:focus-visible]:ring-3 has-[[data-slot=input-group-control]:focus-visible]:ring-ring/50 has-[[data-slot][aria-invalid=true]]:border-destructive has-[[data-slot][aria-invalid=true]]:ring-3 has-[[data-slot][aria-invalid=true]]:ring-destructive/20 has-[>[data-align=block-end]]:h-auto has-[>[data-align=block-end]]:flex-col has-[>[data-align=block-start]]:h-auto has-[>[data-align=block-start]]:flex-col has-[>textarea]:h-auto dark:bg-input/30 dark:has-disabled:bg-input/80 dark:has-[[data-slot][aria-invalid=true]]:ring-destructive/40 has-[>[data-align=block-end]]:[&>input]:pt-3 has-[>[data-align=block-start]]:[&>input]:pb-3 has-[>[data-align=inline-end]]:[&>input]:pr-1.5 has-[>[data-align=inline-start]]:[&>input]:pl-1.5",
+        className
+      )}
+      {...props}
+    />
+  )
+}
+
+const inputGroupAddonVariants = cva(
+  "flex h-auto cursor-text items-center justify-center gap-2 py-1.5 text-sm font-medium text-muted-foreground select-none group-data-[disabled=true]/input-group:opacity-50 [&>kbd]:rounded-[calc(var(--radius)-5px)] [&>svg:not([class*='size-'])]:size-4",
+  {
+    variants: {
+      align: {
+        "inline-start":
+          "order-first pl-2 has-[>button]:ml-[-0.3rem] has-[>kbd]:ml-[-0.15rem]",
+        "inline-end":
+          "order-last pr-2 has-[>button]:mr-[-0.3rem] has-[>kbd]:mr-[-0.15rem]",
+        "block-start":
+          "order-first w-full justify-start px-2.5 pt-2 group-has-[>input]/input-group:pt-2 [.border-b]:pb-2",
+        "block-end":
+          "order-last w-full justify-start px-2.5 pb-2 group-has-[>input]/input-group:pb-2 [.border-t]:pt-2",
+      },
+    },
+    defaultVariants: {
+      align: "inline-start",
+    },
+  }
+)
+
+function InputGroupAddon({
+  className,
+  align = "inline-start",
+  ...props
+}: React.ComponentProps<"div"> & VariantProps<typeof inputGroupAddonVariants>) {
+  return (
+    <div
+      role="group"
+      data-slot="input-group-addon"
+      data-align={align}
+      className={cn(inputGroupAddonVariants({ align }), className)}
+      onClick={(e) => {
+        if ((e.target as HTMLElement).closest("button")) {
+          return
+        }
+        e.currentTarget.parentElement?.querySelector("input")?.focus()
+      }}
+      {...props}
+    />
+  )
+}
+
+const inputGroupButtonVariants = cva(
+  "flex items-center gap-2 text-sm shadow-none",
+  {
+    variants: {
+      size: {
+        xs: "h-6 gap-1 rounded-[calc(var(--radius)-3px)] px-1.5 [&>svg:not([class*='size-'])]:size-3.5",
+        sm: "",
+        "icon-xs":
+          "size-6 rounded-[calc(var(--radius)-3px)] p-0 has-[>svg]:p-0",
+        "icon-sm": "size-8 p-0 has-[>svg]:p-0",
+      },
+    },
+    defaultVariants: {
+      size: "xs",
+    },
+  }
+)
+
+function InputGroupButton({
+  className,
+  type = "button",
+  variant = "ghost",
+  size = "xs",
+  ...props
+}: Omit<React.ComponentProps<typeof Button>, "size" | "type"> &
+  VariantProps<typeof inputGroupButtonVariants> & {
+    type?: "button" | "submit" | "reset"
+  }) {
+  return (
+    <Button
+      type={type}
+      data-size={size}
+      variant={variant}
+      className={cn(inputGroupButtonVariants({ size }), className)}
+      {...props}
+    />
+  )
+}
+
+function InputGroupText({ className, ...props }: React.ComponentProps<"span">) {
+  return (
+    <span
+      className={cn(
+        "flex items-center gap-2 text-sm text-muted-foreground [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4",
+        className
+      )}
+      {...props}
+    />
+  )
+}
+
+function InputGroupInput({
+  className,
+  ...props
+}: React.ComponentProps<"input">) {
+  return (
+    <Input
+      data-slot="input-group-control"
+      className={cn(
+        "flex-1 rounded-none border-0 bg-transparent shadow-none ring-0 focus-visible:ring-0 disabled:bg-transparent aria-invalid:ring-0 dark:bg-transparent dark:disabled:bg-transparent",
+        className
+      )}
+      {...props}
+    />
+  )
+}
+
+function InputGroupTextarea({
+  className,
+  ...props
+}: React.ComponentProps<"textarea">) {
+  return (
+    <Textarea
+      data-slot="input-group-control"
+      className={cn(
+        "flex-1 resize-none rounded-none border-0 bg-transparent py-2 shadow-none ring-0 focus-visible:ring-0 disabled:bg-transparent aria-invalid:ring-0 dark:bg-transparent dark:disabled:bg-transparent",
+        className
+      )}
+      {...props}
+    />
+  )
+}
+
+export {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupText,
+  InputGroupInput,
+  InputGroupTextarea,
+}
+
+--- FILE: src/components/ui/input.tsx ---
+import * as React from "react"
+import { Input as InputPrimitive } from "@base-ui/react/input"
+
+import { cn } from "@/lib/utils"
+
+function Input({ className, type, ...props }: React.ComponentProps<"input">) {
+  return (
+    <InputPrimitive
+      type={type}
+      data-slot="input"
+      className={cn(
+        "h-8 w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-1 text-base transition-colors outline-none file:inline-flex file:h-6 file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:cursor-not-allowed disabled:bg-input/50 disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 md:text-sm dark:bg-input/30 dark:disabled:bg-input/80 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40",
+        className
+      )}
+      {...props}
+    />
+  )
+}
+
+export { Input }
+
+--- FILE: src/components/ui/label.tsx ---
+"use client"
+
+import * as React from "react"
+
+import { cn } from "@/lib/utils"
+
+function Label({ className, ...props }: React.ComponentProps<"label">) {
+  return (
+    <label
+      data-slot="label"
+      className={cn(
+        "flex items-center gap-2 text-sm leading-none font-medium select-none group-data-[disabled=true]:pointer-events-none group-data-[disabled=true]:opacity-50 peer-disabled:cursor-not-allowed peer-disabled:opacity-50",
+        className
+      )}
+      {...props}
+    />
+  )
+}
+
+export { Label }
+
+--- FILE: src/components/ui/phone-number-input.tsx ---
+"use client";
+
+import React, { useState, useEffect, useId, useMemo } from "react";
+import { CheckCircle2, AlertCircle, ChevronDown } from "lucide-react";
+
+export interface CountryOption {
+  code: string; // e.g. "+92"
+  iso: string; // e.g. "PK"
+  name: string; // e.g. "Pakistan"
+  flag: string; // e.g. "🇵🇰"
+  digits: number; // e.g. 10
+  formatDisplay: (raw: string) => string;
+  validate: (raw: string) => boolean;
+  placeholder: string;
+}
+
+export const COUNTRIES: CountryOption[] = [
+  {
+    code: "+92",
+    iso: "PK",
+    name: "Pakistan",
+    flag: "🇵🇰",
+    digits: 10,
+    placeholder: "300-1234567",
+    formatDisplay: (d) => (d.length <= 3 ? d : `${d.slice(0, 3)}-${d.slice(3, 10)}`),
+    validate: (d) => /^3\d{9}$/.test(d),
+  },
+  {
+    code: "+966",
+    iso: "SA",
+    name: "Saudi Arabia",
+    flag: "🇸🇦",
+    digits: 9,
+    placeholder: "50-123-4567",
+    formatDisplay: (d) =>
+      d.length <= 2 ? d : d.length <= 5 ? `${d.slice(0, 2)}-${d.slice(2)}` : `${d.slice(0, 2)}-${d.slice(2, 5)}-${d.slice(5, 9)}`,
+    validate: (d) => /^5\d{8}$/.test(d),
+  },
+  {
+    code: "+971",
+    iso: "AE",
+    name: "UAE",
+    flag: "🇦🇪",
+    digits: 9,
+    placeholder: "50-123-4567",
+    formatDisplay: (d) =>
+      d.length <= 2 ? d : d.length <= 5 ? `${d.slice(0, 2)}-${d.slice(2)}` : `${d.slice(0, 2)}-${d.slice(2, 5)}-${d.slice(5, 9)}`,
+    validate: (d) => /^5\d{8}$/.test(d),
+  },
+  {
+    code: "+44",
+    iso: "GB",
+    name: "United Kingdom",
+    flag: "🇬🇧",
+    digits: 10,
+    placeholder: "7911-123456",
+    formatDisplay: (d) => (d.length <= 4 ? d : `${d.slice(0, 4)}-${d.slice(4, 10)}`),
+    validate: (d) => d.length >= 10,
+  },
+  {
+    code: "+1",
+    iso: "US",
+    name: "USA / Canada",
+    flag: "🇺🇸",
+    digits: 10,
+    placeholder: "202-555-0123",
+    formatDisplay: (d) =>
+      d.length <= 3 ? d : d.length <= 6 ? `${d.slice(0, 3)}-${d.slice(3)}` : `${d.slice(0, 3)}-${d.slice(3, 6)}-${d.slice(6, 10)}`,
+    validate: (d) => d.length === 10,
+  },
+  {
+    code: "+91",
+    iso: "IN",
+    name: "India",
+    flag: "🇮🇳",
+    digits: 10,
+    placeholder: "98765-43210",
+    formatDisplay: (d) => (d.length <= 5 ? d : `${d.slice(0, 5)}-${d.slice(5, 10)}`),
+    validate: (d) => d.length === 10,
+  },
+  {
+    code: "+93",
+    iso: "AF",
+    name: "Afghanistan",
+    flag: "🇦🇫",
+    digits: 9,
+    placeholder: "70-123-4567",
+    formatDisplay: (d) => (d.length <= 2 ? d : `${d.slice(0, 2)}-${d.slice(2, 9)}`),
+    validate: (d) => d.length === 9,
+  },
+  {
+    code: "+968",
+    iso: "OM",
+    name: "Oman",
+    flag: "🇴🇲",
+    digits: 8,
+    placeholder: "9123-4567",
+    formatDisplay: (d) => (d.length <= 4 ? d : `${d.slice(0, 4)}-${d.slice(4, 8)}`),
+    validate: (d) => d.length === 8,
+  },
+  {
+    code: "+974",
+    iso: "QA",
+    name: "Qatar",
+    flag: "🇶🇦",
+    digits: 8,
+    placeholder: "3312-3456",
+    formatDisplay: (d) => (d.length <= 4 ? d : `${d.slice(0, 4)}-${d.slice(4, 8)}`),
+    validate: (d) => d.length === 8,
+  },
+  {
+    code: "+965",
+    iso: "KW",
+    name: "Kuwait",
+    flag: "🇰🇼",
+    digits: 8,
+    placeholder: "9123-4567",
+    formatDisplay: (d) => (d.length <= 4 ? d : `${d.slice(0, 4)}-${d.slice(4, 8)}`),
+    validate: (d) => d.length === 8,
+  },
+  {
+    code: "+973",
+    iso: "BH",
+    name: "Bahrain",
+    flag: "🇧🇭",
+    digits: 8,
+    placeholder: "3612-3456",
+    formatDisplay: (d) => (d.length <= 4 ? d : `${d.slice(0, 4)}-${d.slice(4, 8)}`),
+    validate: (d) => d.length === 8,
+  },
+  {
+    code: "+",
+    iso: "INTL",
+    name: "Other (International)",
+    flag: "🌐",
+    digits: 15,
+    placeholder: "Enter phone number",
+    formatDisplay: (d) => d,
+    validate: (d) => d.length >= 7,
+  },
+];
+
+export interface PhoneNumberInputProps {
+  value?: string;
+  onChange?: (value: string) => void;
+  onValidationChange?: (isValid: boolean) => void;
+  placeholder?: string;
+  disabled?: boolean;
+  required?: boolean;
+  id?: string;
+  name?: string;
+  className?: string;
+  error?: string;
+  showHelperText?: boolean;
+}
+
+/**
+ * Parses initial string into country and raw local digits
+ */
+export function parsePhoneValue(value: string | null | undefined): { countryCode: string; rawDigits: string } {
+  if (!value) return { countryCode: "+92", rawDigits: "" };
+
+  const trimmed = value.trim();
+  // Find matching country code prefix
+  for (const c of COUNTRIES) {
+    if (c.code !== "+" && trimmed.startsWith(c.code)) {
+      const remaining = trimmed.slice(c.code.length).replace(/\D/g, "");
+      return { countryCode: c.code, rawDigits: remaining.slice(0, c.digits) };
+    }
+  }
+
+  // Check if starts with 0 or plain digits (assume Pakistan)
+  const allDigits = trimmed.replace(/\D/g, "");
+  if (allDigits.startsWith("92") && allDigits.length > 10) {
+    return { countryCode: "+92", rawDigits: allDigits.slice(2, 12) };
+  }
+  if (allDigits.startsWith("0")) {
+    return { countryCode: "+92", rawDigits: allDigits.slice(1, 11) };
+  }
+  if (allDigits.length > 0) {
+    return { countryCode: "+92", rawDigits: allDigits.slice(0, 10) };
+  }
+
+  return { countryCode: "+92", rawDigits: "" };
+}
+
+export const PhoneNumberInput = React.forwardRef<HTMLInputElement, PhoneNumberInputProps>(
+  (
+    {
+      value = "",
+      onChange,
+      onValidationChange,
+      placeholder,
+      disabled = false,
+      required = false,
+      id,
+      name,
+      className = "",
+      error,
+      showHelperText = true,
+    },
+    ref
+  ) => {
+    const generatedId = useId();
+    const inputId = id || generatedId;
+
+    const parsed = useMemo(() => parsePhoneValue(value), [value]);
+
+    const [selectedCountryCode, setSelectedCountryCode] = useState<string>(parsed.countryCode);
+    const [rawDigits, setRawDigits] = useState<string>(parsed.rawDigits);
+    const [touched, setTouched] = useState<boolean>(false);
+
+    const activeCountry = useMemo(
+      () => COUNTRIES.find((c) => c.code === selectedCountryCode) || COUNTRIES[0],
+      [selectedCountryCode]
+    );
+
+    // Keep internal state in sync with external value without triggering loops
+    useEffect(() => {
+      const nextParsed = parsePhoneValue(value);
+      if (nextParsed.countryCode !== selectedCountryCode || nextParsed.rawDigits !== rawDigits) {
+        setSelectedCountryCode(nextParsed.countryCode);
+        setRawDigits(nextParsed.rawDigits);
+      }
+    }, [value]);
+
+    const isValid = useMemo(() => {
+      if (!rawDigits) return false;
+      return activeCountry.validate(rawDigits);
+    }, [rawDigits, activeCountry]);
+
+    const isInvalid = touched && rawDigits.length > 0 && !isValid;
+    const isRequiredEmpty = touched && required && rawDigits.length === 0;
+
+    useEffect(() => {
+      onValidationChange?.(isValid);
+    }, [isValid, onValidationChange]);
+
+    const handleCountryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+      const newCode = e.target.value;
+      setSelectedCountryCode(newCode);
+      const newCountry = COUNTRIES.find((c) => c.code === newCode) || COUNTRIES[0];
+
+      // Trim raw digits if exceeds new country max
+      const trimmedDigits = rawDigits.slice(0, newCountry.digits);
+      setRawDigits(trimmedDigits);
+
+      if (trimmedDigits.length > 0) {
+        onChange?.(`${newCode} ${trimmedDigits}`);
+      } else {
+        onChange?.("");
+      }
+    };
+
+    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const inputStr = e.target.value;
+
+      // Extract ONLY digits
+      let nextDigits = inputStr.replace(/\D/g, "");
+
+      // For Pakistan, auto-strip leading 0 if typed
+      if (activeCountry.code === "+92" && nextDigits.startsWith("0")) {
+        nextDigits = nextDigits.slice(1);
+      }
+
+      // Cap at active country max digits
+      nextDigits = nextDigits.slice(0, activeCountry.digits);
+
+      setRawDigits(nextDigits);
+
+      // Emit clean standardized output
+      if (nextDigits.length > 0) {
+        onChange?.(`${activeCountry.code} ${nextDigits}`);
+      } else {
+        onChange?.("");
+      }
+    };
+
+    const handleBlur = () => {
+      setTouched(true);
+    };
+
+    // Calculate display value purely from raw digits
+    const displayValue = activeCountry.formatDisplay(rawDigits);
+
+    // Dynamic styling
+    let statusClass = "border-input focus-within:ring-2 focus-within:ring-ring focus-within:border-primary";
+    if (error || isInvalid || isRequiredEmpty) {
+      statusClass = "border-destructive/80 focus-within:ring-2 focus-within:ring-destructive/30 bg-destructive/5";
+    } else if (isValid) {
+      statusClass = "border-emerald-500/80 focus-within:ring-2 focus-within:ring-emerald-500/30 bg-emerald-500/5";
+    }
+
+    return (
+      <div className={`flex flex-col gap-1 w-full ${className}`}>
+        <div
+          className={`flex items-center rounded-lg border bg-background overflow-hidden transition-all shadow-sm ${statusClass} ${
+            disabled ? "opacity-60 cursor-not-allowed" : ""
+          }`}
+        >
+          {/* Selectable Country Code Dropdown */}
+          <div className="relative flex items-center bg-muted/60 border-r border-input/60 select-none shrink-0 transition-colors hover:bg-muted/90">
+            <div className="flex items-center gap-1.5 px-3 py-2 text-sm font-semibold text-foreground/80 pointer-events-none">
+              <span>{activeCountry.flag}</span>
+              <span>{activeCountry.code}</span>
+              <ChevronDown className="h-3.5 w-3.5 opacity-50 ml-0.5" />
+            </div>
+            <select
+              value={selectedCountryCode}
+              onChange={handleCountryChange}
+              disabled={disabled}
+              aria-label="Select Country Code"
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
+            >
+              {COUNTRIES.map((c) => (
+                <option key={c.iso} value={c.code}>
+                  {c.flag} {c.name} ({c.code})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Formatted Display Input */}
+          <input
+            ref={ref}
+            id={inputId}
+            name={name}
+            type="tel"
+            disabled={disabled}
+            required={required}
+            value={displayValue}
+            onChange={handleInputChange}
+            onBlur={handleBlur}
+            placeholder={placeholder || activeCountry.placeholder}
+            maxLength={activeCountry.digits + 4} // digits + formatting separators
+            className="w-full bg-transparent px-3 py-2 text-sm font-medium tracking-wide outline-none placeholder:text-muted-foreground/60 disabled:cursor-not-allowed"
+          />
+
+          {/* Status Indicator Feedback */}
+          <div className="pr-3 flex items-center justify-center shrink-0">
+            {isValid ? (
+              <div
+                className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 animate-in fade-in zoom-in-90 duration-200"
+                title={`Valid ${activeCountry.name} phone number`}
+              >
+                <CheckCircle2 className="h-4 w-4" />
+              </div>
+            ) : isInvalid ? (
+              <div
+                className="flex items-center gap-1 text-destructive animate-in fade-in duration-200"
+                title="Incomplete or invalid number"
+              >
+                <AlertCircle className="h-4 w-4" />
+              </div>
+            ) : rawDigits.length > 0 ? (
+              <span className="text-[11px] font-mono font-medium text-muted-foreground/70">
+                {rawDigits.length}/{activeCountry.digits}
+              </span>
+            ) : null}
+          </div>
+        </div>
+
+        {/* Inline Helper / Error Feedback */}
+        {showHelperText && (
+          <div className="flex items-center justify-between text-[11px] px-0.5">
+            {error || isInvalid ? (
+              <span className="text-destructive font-medium">
+                {error ||
+                  (rawDigits.length < activeCountry.digits
+                    ? `Enter ${activeCountry.digits} digits for ${activeCountry.name} (${
+                        activeCountry.digits - rawDigits.length
+                      } more needed)`
+                    : `Invalid format for ${activeCountry.name} (e.g. ${activeCountry.placeholder})`)}
+              </span>
+            ) : isRequiredEmpty ? (
+              <span className="text-destructive font-medium">Phone number is required</span>
+            ) : isValid ? (
+              <span className="text-emerald-600 dark:text-emerald-400 font-medium">
+                Valid {activeCountry.name} number
+              </span>
+            ) : (
+              <span className="text-muted-foreground/70">
+                Enter {activeCountry.digits}-digit number (e.g. {activeCountry.placeholder})
+              </span>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  }
+);
+
+PhoneNumberInput.displayName = "PhoneNumberInput";
+
+--- FILE: src/components/ui/popover.tsx ---
+"use client"
+
+import * as React from "react"
+import { Popover as PopoverPrimitive } from "@base-ui/react/popover"
+
+import { cn } from "@/lib/utils"
+
+function Popover({ ...props }: PopoverPrimitive.Root.Props) {
+  return <PopoverPrimitive.Root data-slot="popover" {...props} />
+}
+
+function PopoverTrigger({ ...props }: PopoverPrimitive.Trigger.Props) {
+  return <PopoverPrimitive.Trigger data-slot="popover-trigger" {...props} />
+}
+
+function PopoverContent({
+  className,
+  align = "center",
+  alignOffset = 0,
+  side = "bottom",
+  sideOffset = 4,
+  ...props
+}: PopoverPrimitive.Popup.Props &
+  Pick<
+    PopoverPrimitive.Positioner.Props,
+    "align" | "alignOffset" | "side" | "sideOffset"
+  >) {
+  return (
+    <PopoverPrimitive.Portal>
+      <PopoverPrimitive.Positioner
+        align={align}
+        alignOffset={alignOffset}
+        side={side}
+        sideOffset={sideOffset}
+        className="isolate z-50"
+      >
+        <PopoverPrimitive.Popup
+          data-slot="popover-content"
+          className={cn(
+            "z-50 flex w-72 origin-(--transform-origin) flex-col gap-2.5 rounded-lg bg-popover p-2.5 text-sm text-popover-foreground shadow-md ring-1 ring-foreground/10 outline-hidden duration-100 data-[side=bottom]:slide-in-from-top-2 data-[side=inline-end]:slide-in-from-left-2 data-[side=inline-start]:slide-in-from-right-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
+            className
+          )}
+          {...props}
+        />
+      </PopoverPrimitive.Positioner>
+    </PopoverPrimitive.Portal>
+  )
+}
+
+function PopoverHeader({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="popover-header"
+      className={cn("flex flex-col gap-0.5 text-sm", className)}
+      {...props}
+    />
+  )
+}
+
+function PopoverTitle({ className, ...props }: PopoverPrimitive.Title.Props) {
+  return (
+    <PopoverPrimitive.Title
+      data-slot="popover-title"
+      className={cn("font-medium", className)}
+      {...props}
+    />
+  )
+}
+
+function PopoverDescription({
+  className,
+  ...props
+}: PopoverPrimitive.Description.Props) {
+  return (
+    <PopoverPrimitive.Description
+      data-slot="popover-description"
+      className={cn("text-muted-foreground", className)}
+      {...props}
+    />
+  )
+}
+
+export {
+  Popover,
+  PopoverContent,
+  PopoverDescription,
+  PopoverHeader,
+  PopoverTitle,
+  PopoverTrigger,
+}
+
+--- FILE: src/components/ui/scroll-area.tsx ---
+"use client"
+
+import * as React from "react"
+import { ScrollArea as ScrollAreaPrimitive } from "@base-ui/react/scroll-area"
+
+import { cn } from "@/lib/utils"
+
+function ScrollArea({
+  className,
+  children,
+  ...props
+}: ScrollAreaPrimitive.Root.Props) {
+  return (
+    <ScrollAreaPrimitive.Root
+      data-slot="scroll-area"
+      className={cn("relative", className)}
+      {...props}
+    >
+      <ScrollAreaPrimitive.Viewport
+        data-slot="scroll-area-viewport"
+        className="size-full rounded-[inherit] transition-[color,box-shadow] outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-1"
+      >
+        {children}
+      </ScrollAreaPrimitive.Viewport>
+      <ScrollBar />
+      <ScrollAreaPrimitive.Corner />
+    </ScrollAreaPrimitive.Root>
+  )
+}
+
+function ScrollBar({
+  className,
+  orientation = "vertical",
+  ...props
+}: ScrollAreaPrimitive.Scrollbar.Props) {
+  return (
+    <ScrollAreaPrimitive.Scrollbar
+      data-slot="scroll-area-scrollbar"
+      data-orientation={orientation}
+      orientation={orientation}
+      className={cn(
+        "flex touch-none p-px transition-colors select-none data-horizontal:h-2.5 data-horizontal:flex-col data-horizontal:border-t data-horizontal:border-t-transparent data-vertical:h-full data-vertical:w-2.5 data-vertical:border-l data-vertical:border-l-transparent",
+        className
+      )}
+      {...props}
+    >
+      <ScrollAreaPrimitive.Thumb
+        data-slot="scroll-area-thumb"
+        className="relative flex-1 rounded-full bg-border"
+      />
+    </ScrollAreaPrimitive.Scrollbar>
+  )
+}
+
+export { ScrollArea, ScrollBar }
+
+--- FILE: src/components/ui/select.tsx ---
+"use client"
+
+import * as React from "react"
+import { Select as SelectPrimitive } from "@base-ui/react/select"
+
+import { cn } from "@/lib/utils"
+import { ChevronDownIcon, CheckIcon, ChevronUpIcon } from "lucide-react"
+
+const Select = SelectPrimitive.Root
+
+function SelectGroup({ className, ...props }: SelectPrimitive.Group.Props) {
+  return (
+    <SelectPrimitive.Group
+      data-slot="select-group"
+      className={cn("scroll-my-1 p-1", className)}
+      {...props}
+    />
+  )
+}
+
+function SelectValue({ className, ...props }: SelectPrimitive.Value.Props) {
+  return (
+    <SelectPrimitive.Value
+      data-slot="select-value"
+      className={cn("flex flex-1 text-left", className)}
+      {...props}
+    />
+  )
+}
+
+function SelectTrigger({
+  className,
+  size = "default",
+  children,
+  ...props
+}: SelectPrimitive.Trigger.Props & {
+  size?: "sm" | "default"
+}) {
+  return (
+    <SelectPrimitive.Trigger
+      data-slot="select-trigger"
+      data-size={size}
+      className={cn(
+        "flex w-fit items-center justify-between gap-1.5 rounded-lg border border-input bg-transparent py-2 pr-2 pl-2.5 text-sm whitespace-nowrap transition-colors outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 data-placeholder:text-muted-foreground data-[size=default]:h-8 data-[size=sm]:h-7 data-[size=sm]:rounded-[min(var(--radius-md),10px)] *:data-[slot=select-value]:line-clamp-1 *:data-[slot=select-value]:flex *:data-[slot=select-value]:items-center *:data-[slot=select-value]:gap-1.5 dark:bg-input/30 dark:hover:bg-input/50 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+        className
+      )}
+      {...props}
+    >
+      {children}
+      <SelectPrimitive.Icon
+        render={
+          <ChevronDownIcon className="pointer-events-none size-4 text-muted-foreground" />
+        }
+      />
+    </SelectPrimitive.Trigger>
+  )
+}
+
+function SelectContent({
+  className,
+  children,
+  side = "bottom",
+  sideOffset = 4,
+  align = "center",
+  alignOffset = 0,
+  alignItemWithTrigger = true,
+  ...props
+}: SelectPrimitive.Popup.Props &
+  Pick<
+    SelectPrimitive.Positioner.Props,
+    "align" | "alignOffset" | "side" | "sideOffset" | "alignItemWithTrigger"
+  >) {
+  return (
+    <SelectPrimitive.Portal>
+      <SelectPrimitive.Positioner
+        side={side}
+        sideOffset={sideOffset}
+        align={align}
+        alignOffset={alignOffset}
+        alignItemWithTrigger={alignItemWithTrigger}
+        className="isolate z-50"
+      >
+        <SelectPrimitive.Popup
+          data-slot="select-content"
+          data-align-trigger={alignItemWithTrigger}
+          className={cn("relative isolate z-50 max-h-(--available-height) w-(--anchor-width) min-w-36 origin-(--transform-origin) overflow-x-hidden overflow-y-auto rounded-lg bg-popover text-popover-foreground shadow-md ring-1 ring-foreground/10 duration-100 data-[align-trigger=true]:animate-none data-[side=bottom]:slide-in-from-top-2 data-[side=inline-end]:slide-in-from-left-2 data-[side=inline-start]:slide-in-from-right-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95", className )}
+          {...props}
+        >
+          <SelectScrollUpButton />
+          <SelectPrimitive.List>{children}</SelectPrimitive.List>
+          <SelectScrollDownButton />
+        </SelectPrimitive.Popup>
+      </SelectPrimitive.Positioner>
+    </SelectPrimitive.Portal>
+  )
+}
+
+function SelectLabel({
+  className,
+  ...props
+}: SelectPrimitive.GroupLabel.Props) {
+  return (
+    <SelectPrimitive.GroupLabel
+      data-slot="select-label"
+      className={cn("px-1.5 py-1 text-xs text-muted-foreground", className)}
+      {...props}
+    />
+  )
+}
+
+function SelectItem({
+  className,
+  children,
+  ...props
+}: SelectPrimitive.Item.Props) {
+  return (
+    <SelectPrimitive.Item
+      data-slot="select-item"
+      className={cn(
+        "relative flex w-full cursor-default items-center gap-1.5 rounded-md py-1 pr-8 pl-1.5 text-sm outline-hidden select-none focus:bg-accent focus:text-accent-foreground not-data-[variant=destructive]:focus:**:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 *:[span]:last:flex *:[span]:last:items-center *:[span]:last:gap-2",
+        className
+      )}
+      {...props}
+    >
+      <SelectPrimitive.ItemText className="flex flex-1 shrink-0 gap-2 whitespace-nowrap">
+        {children}
+      </SelectPrimitive.ItemText>
+      <SelectPrimitive.ItemIndicator
+        render={
+          <span className="pointer-events-none absolute right-2 flex size-4 items-center justify-center" />
+        }
+      >
+        <CheckIcon className="pointer-events-none" />
+      </SelectPrimitive.ItemIndicator>
+    </SelectPrimitive.Item>
+  )
+}
+
+function SelectSeparator({
+  className,
+  ...props
+}: SelectPrimitive.Separator.Props) {
+  return (
+    <SelectPrimitive.Separator
+      data-slot="select-separator"
+      className={cn("pointer-events-none -mx-1 my-1 h-px bg-border", className)}
+      {...props}
+    />
+  )
+}
+
+function SelectScrollUpButton({
+  className,
+  ...props
+}: React.ComponentProps<typeof SelectPrimitive.ScrollUpArrow>) {
+  return (
+    <SelectPrimitive.ScrollUpArrow
+      data-slot="select-scroll-up-button"
+      className={cn(
+        "top-0 z-10 flex w-full cursor-default items-center justify-center bg-popover py-1 [&_svg:not([class*='size-'])]:size-4",
+        className
+      )}
+      {...props}
+    >
+      <ChevronUpIcon
+      />
+    </SelectPrimitive.ScrollUpArrow>
+  )
+}
+
+function SelectScrollDownButton({
+  className,
+  ...props
+}: React.ComponentProps<typeof SelectPrimitive.ScrollDownArrow>) {
+  return (
+    <SelectPrimitive.ScrollDownArrow
+      data-slot="select-scroll-down-button"
+      className={cn(
+        "bottom-0 z-10 flex w-full cursor-default items-center justify-center bg-popover py-1 [&_svg:not([class*='size-'])]:size-4",
+        className
+      )}
+      {...props}
+    >
+      <ChevronDownIcon
+      />
+    </SelectPrimitive.ScrollDownArrow>
+  )
+}
+
+export {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectScrollDownButton,
+  SelectScrollUpButton,
+  SelectSeparator,
+  SelectTrigger,
+  SelectValue,
+}
+
+--- FILE: src/components/ui/separator.tsx ---
+"use client"
+
+import { Separator as SeparatorPrimitive } from "@base-ui/react/separator"
+
+import { cn } from "@/lib/utils"
+
+function Separator({
+  className,
+  orientation = "horizontal",
+  ...props
+}: SeparatorPrimitive.Props) {
+  return (
+    <SeparatorPrimitive
+      data-slot="separator"
+      orientation={orientation}
+      className={cn(
+        "shrink-0 bg-border data-horizontal:h-px data-horizontal:w-full data-vertical:w-px data-vertical:self-stretch",
+        className
+      )}
+      {...props}
+    />
+  )
+}
+
+export { Separator }
+
+--- FILE: src/components/ui/sheet.tsx ---
+"use client"
+
+import * as React from "react"
+import { Dialog as SheetPrimitive } from "@base-ui/react/dialog"
+
+import { cn } from "@/lib/utils"
+import { Button } from "@/components/ui/button"
+import { XIcon } from "lucide-react"
+
+function Sheet({ ...props }: SheetPrimitive.Root.Props) {
+  return <SheetPrimitive.Root data-slot="sheet" {...props} />
+}
+
+function SheetTrigger({ ...props }: SheetPrimitive.Trigger.Props) {
+  return <SheetPrimitive.Trigger data-slot="sheet-trigger" {...props} />
+}
+
+function SheetClose({ ...props }: SheetPrimitive.Close.Props) {
+  return <SheetPrimitive.Close data-slot="sheet-close" {...props} />
+}
+
+function SheetPortal({ ...props }: SheetPrimitive.Portal.Props) {
+  return <SheetPrimitive.Portal data-slot="sheet-portal" {...props} />
+}
+
+function SheetOverlay({ className, ...props }: SheetPrimitive.Backdrop.Props) {
+  return (
+    <SheetPrimitive.Backdrop
+      data-slot="sheet-overlay"
+      className={cn(
+        "fixed inset-0 z-50 bg-black/10 transition-opacity duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0 supports-backdrop-filter:backdrop-blur-xs",
+        className
+      )}
+      {...props}
+    />
+  )
+}
+
+function SheetContent({
+  className,
+  children,
+  side = "right",
+  showCloseButton = true,
+  ...props
+}: SheetPrimitive.Popup.Props & {
+  side?: "top" | "right" | "bottom" | "left"
+  showCloseButton?: boolean
+}) {
+  return (
+    <SheetPortal>
+      <SheetOverlay />
+      <SheetPrimitive.Popup
+        data-slot="sheet-content"
+        data-side={side}
+        className={cn(
+          "fixed z-50 flex flex-col gap-4 bg-popover bg-clip-padding text-sm text-popover-foreground shadow-lg transition duration-200 ease-in-out data-ending-style:opacity-0 data-starting-style:opacity-0 data-[side=bottom]:inset-x-0 data-[side=bottom]:bottom-0 data-[side=bottom]:h-auto data-[side=bottom]:border-t data-[side=bottom]:data-ending-style:translate-y-[2.5rem] data-[side=bottom]:data-starting-style:translate-y-[2.5rem] data-[side=left]:inset-y-0 data-[side=left]:left-0 data-[side=left]:h-full data-[side=left]:w-3/4 data-[side=left]:border-r data-[side=left]:data-ending-style:translate-x-[-2.5rem] data-[side=left]:data-starting-style:translate-x-[-2.5rem] data-[side=right]:inset-y-0 data-[side=right]:right-0 data-[side=right]:h-full data-[side=right]:w-3/4 data-[side=right]:border-l data-[side=right]:data-ending-style:translate-x-[2.5rem] data-[side=right]:data-starting-style:translate-x-[2.5rem] data-[side=top]:inset-x-0 data-[side=top]:top-0 data-[side=top]:h-auto data-[side=top]:border-b data-[side=top]:data-ending-style:translate-y-[-2.5rem] data-[side=top]:data-starting-style:translate-y-[-2.5rem] data-[side=left]:sm:max-w-sm data-[side=right]:sm:max-w-sm",
+          className
+        )}
+        {...props}
+      >
+        {children}
+        {showCloseButton && (
+          <SheetPrimitive.Close
+            data-slot="sheet-close"
+            render={
+              <Button
+                variant="ghost"
+                className="absolute top-3 right-3"
+                size="icon-sm"
+              />
+            }
+          >
+            <XIcon
+            />
+            <span className="sr-only">Close</span>
+          </SheetPrimitive.Close>
+        )}
+      </SheetPrimitive.Popup>
+    </SheetPortal>
+  )
+}
+
+function SheetHeader({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="sheet-header"
+      className={cn("flex flex-col gap-0.5 p-4", className)}
+      {...props}
+    />
+  )
+}
+
+function SheetFooter({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="sheet-footer"
+      className={cn("mt-auto flex flex-col gap-2 p-4", className)}
+      {...props}
+    />
+  )
+}
+
+function SheetTitle({ className, ...props }: SheetPrimitive.Title.Props) {
+  return (
+    <SheetPrimitive.Title
+      data-slot="sheet-title"
+      className={cn(
+        "font-heading text-base font-medium text-foreground",
+        className
+      )}
+      {...props}
+    />
+  )
+}
+
+function SheetDescription({
+  className,
+  ...props
+}: SheetPrimitive.Description.Props) {
+  return (
+    <SheetPrimitive.Description
+      data-slot="sheet-description"
+      className={cn("text-sm text-muted-foreground", className)}
+      {...props}
+    />
+  )
+}
+
+export {
+  Sheet,
+  SheetTrigger,
+  SheetClose,
+  SheetContent,
+  SheetHeader,
+  SheetFooter,
+  SheetTitle,
+  SheetDescription,
+}
+
+--- FILE: src/components/ui/switch.tsx ---
+"use client"
+
+import { Switch as SwitchPrimitive } from "@base-ui/react/switch"
+
+import { cn } from "@/lib/utils"
+
+function Switch({
+  className,
+  size = "default",
+  ...props
+}: SwitchPrimitive.Root.Props & {
+  size?: "sm" | "default"
+}) {
+  return (
+    <SwitchPrimitive.Root
+      data-slot="switch"
+      data-size={size}
+      className={cn(
+        "peer group/switch relative inline-flex shrink-0 items-center rounded-full border border-transparent transition-all outline-none after:absolute after:-inset-x-3 after:-inset-y-2 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 data-[size=default]:h-[18.4px] data-[size=default]:w-[32px] data-[size=sm]:h-[14px] data-[size=sm]:w-[24px] dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 data-checked:bg-primary data-unchecked:bg-input dark:data-unchecked:bg-input/80 data-disabled:cursor-not-allowed data-disabled:opacity-50",
+        className
+      )}
+      {...props}
+    >
+      <SwitchPrimitive.Thumb
+        data-slot="switch-thumb"
+        className="pointer-events-none block rounded-full bg-background ring-0 transition-transform group-data-[size=default]/switch:size-4 group-data-[size=sm]/switch:size-3 group-data-[size=default]/switch:data-checked:translate-x-[calc(100%-2px)] group-data-[size=sm]/switch:data-checked:translate-x-[calc(100%-2px)] dark:data-checked:bg-primary-foreground group-data-[size=default]/switch:data-unchecked:translate-x-0 group-data-[size=sm]/switch:data-unchecked:translate-x-0 dark:data-unchecked:bg-foreground"
+      />
+    </SwitchPrimitive.Root>
+  )
+}
+
+export { Switch }
+
+--- FILE: src/components/ui/textarea.tsx ---
+import * as React from "react"
+
+import { cn } from "@/lib/utils"
+
+function Textarea({ className, ...props }: React.ComponentProps<"textarea">) {
+  return (
+    <textarea
+      data-slot="textarea"
+      className={cn(
+        "flex field-sizing-content min-h-16 w-full rounded-lg border border-input bg-transparent px-2.5 py-2 text-base transition-colors outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:bg-input/50 disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 md:text-sm dark:bg-input/30 dark:disabled:bg-input/80 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40",
+        className
+      )}
+      {...props}
+    />
+  )
+}
+
+export { Textarea }
+
+--- FILE: src/components/ui/tooltip.tsx ---
+"use client"
+
+import { Tooltip as TooltipPrimitive } from "@base-ui/react/tooltip"
+
+import { cn } from "@/lib/utils"
+
+function TooltipProvider({
+  delay = 0,
+  ...props
+}: TooltipPrimitive.Provider.Props) {
+  return (
+    <TooltipPrimitive.Provider
+      data-slot="tooltip-provider"
+      delay={delay}
+      {...props}
+    />
+  )
+}
+
+function Tooltip({ ...props }: TooltipPrimitive.Root.Props) {
+  return <TooltipPrimitive.Root data-slot="tooltip" {...props} />
+}
+
+function TooltipTrigger({ ...props }: TooltipPrimitive.Trigger.Props) {
+  return <TooltipPrimitive.Trigger data-slot="tooltip-trigger" {...props} />
+}
+
+function TooltipContent({
+  className,
+  side = "top",
+  sideOffset = 4,
+  align = "center",
+  alignOffset = 0,
+  children,
+  ...props
+}: TooltipPrimitive.Popup.Props &
+  Pick<
+    TooltipPrimitive.Positioner.Props,
+    "align" | "alignOffset" | "side" | "sideOffset"
+  >) {
+  return (
+    <TooltipPrimitive.Portal>
+      <TooltipPrimitive.Positioner
+        align={align}
+        alignOffset={alignOffset}
+        side={side}
+        sideOffset={sideOffset}
+        className="isolate z-50"
+      >
+        <TooltipPrimitive.Popup
+          data-slot="tooltip-content"
+          className={cn(
+            "z-50 inline-flex w-fit max-w-xs origin-(--transform-origin) items-center gap-1.5 rounded-md bg-foreground px-3 py-1.5 text-xs text-background has-data-[slot=kbd]:pr-1.5 data-[side=bottom]:slide-in-from-top-2 data-[side=inline-end]:slide-in-from-left-2 data-[side=inline-start]:slide-in-from-right-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 **:data-[slot=kbd]:relative **:data-[slot=kbd]:isolate **:data-[slot=kbd]:z-50 **:data-[slot=kbd]:rounded-sm data-[state=delayed-open]:animate-in data-[state=delayed-open]:fade-in-0 data-[state=delayed-open]:zoom-in-95 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
+            className
+          )}
+          {...props}
+        >
+          {children}
+          <TooltipPrimitive.Arrow className="z-50 size-2.5 translate-y-[calc(-50%-2px)] rotate-45 rounded-[2px] bg-foreground fill-foreground data-[side=bottom]:top-1 data-[side=inline-end]:top-1/2! data-[side=inline-end]:-left-1 data-[side=inline-end]:-translate-y-1/2 data-[side=inline-start]:top-1/2! data-[side=inline-start]:-right-1 data-[side=inline-start]:-translate-y-1/2 data-[side=left]:top-1/2! data-[side=left]:-right-1 data-[side=left]:-translate-y-1/2 data-[side=right]:top-1/2! data-[side=right]:-left-1 data-[side=right]:-translate-y-1/2 data-[side=top]:-bottom-2.5" />
+        </TooltipPrimitive.Popup>
+      </TooltipPrimitive.Positioner>
+    </TooltipPrimitive.Portal>
+  )
+}
+
+export { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider }
 
 --- FILE: src/app/(dashboard)/appointments/[id]/visit/form.tsx ---
 "use client";
@@ -21932,10 +22555,6 @@ export default async function SettingsPage() {
   );
 }
 
-================================================================================
-# LEVEL 5: PLATFORM-SPECIFIC CONFIGURATIONS, DATABASE SCRIPTS, AND DEPLOYMENT UTILITIES
-================================================================================
-
 --- FILE: prisma/seed.ts ---
 import { hashSync } from 'bcrypt';
 import { prisma } from '../src/lib/prisma';
@@ -22796,6 +23415,38 @@ SELECT setval('sale_seq', COALESCE((SELECT MAX(extract_last_number("saleNo")) FR
 SELECT setval('lab_order_seq', COALESCE((SELECT MAX(extract_last_number("orderNo")) FROM "LabOrder"), 0));
 SELECT setval('sample_seq', COALESCE((SELECT MAX(extract_last_number("sampleNo")) FROM "Sample"), 0));
 
+--- FILE: build/installer.nsh ---
+!macro customInstall
+  DetailPrint "Checking Visual C++ Redistributable 2015-2022 (x64)..."
+  ClearErrors
+
+  ; Check 64-bit Registry Key for Visual C++ 2015-2022 Redistributable
+  ReadRegDWORD $0 HKLM "SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64" "Installed"
+  StrCmp $0 "1" VcRedistInstalled 0
+
+  ; Check WOW6432Node Registry Key as Fallback
+  ReadRegDWORD $0 HKLM "SOFTWARE\WOW6432Node\Microsoft\VisualStudio\14.0\VC\Runtimes\x64" "Installed"
+  StrCmp $0 "1" VcRedistInstalled 0
+
+  DetailPrint "Visual C++ Redistributable (x64) is not installed or check bypassed. Running installer silently..."
+  SetOutPath "$TEMP"
+  File "${BUILD_RESOURCES_DIR}\vc_redist.x64.exe"
+  ClearErrors
+  ExecWait '"$TEMP\vc_redist.x64.exe" /install /quiet /norestart' $0
+  DetailPrint "Visual C++ Redistributable installer finished with exit code: $0 (continuing installation regardless)"
+  ClearErrors
+  Delete "$TEMP\vc_redist.x64.exe"
+  ClearErrors
+  Goto DoneVcRedist
+
+  VcRedistInstalled:
+  DetailPrint "Visual C++ Redistributable (x64) is already installed."
+
+  DoneVcRedist:
+  ClearErrors
+!macroend
+
+
 --- FILE: scripts/capture-all-screens-3456.js ---
 const puppeteer = require('puppeteer');
 const fs = require('fs');
@@ -23522,6 +24173,115 @@ async function main() {
 }
 
 main().catch(console.error);
+
+--- FILE: scripts/generate_dump.js ---
+const fs = require('fs');
+const path = require('path');
+
+function normalizePath(p) {
+  return p.replace(/\\/g, '/');
+}
+
+function getFilesInDir(dir, exts = null) {
+  let res = [];
+  if (!fs.existsSync(dir)) return res;
+  const entries = fs.readdirSync(dir, { withFileTypes: true });
+  for (const ent of entries) {
+    const full = path.join(dir, ent.name);
+    if (ent.isDirectory()) {
+      res = res.concat(getFilesInDir(full, exts));
+    } else if (ent.isFile()) {
+      if (!exts || exts.some(ext => ent.name.endsWith(ext))) {
+        res.push(normalizePath(path.relative(process.cwd(), full)));
+      }
+    }
+  }
+  return res.sort();
+}
+
+// Level 1: Root configuration and dependency files
+const level1 = [
+  'package.json',
+  'tsconfig.json',
+  'next.config.ts',
+  'postcss.config.mjs',
+  'eslint.config.mjs',
+  'components.json',
+  'prisma.config.ts',
+  '.env.example',
+  'prisma/schema.prisma',
+  'prisma/migrations/20260802085518_init/migration.sql',
+  'prisma/migrations/migration_lock.toml'
+].filter(f => fs.existsSync(f));
+
+// Level 2: Main entry point / initialization files
+const level2 = [
+  'src/app/layout.tsx',
+  'src/app/page.tsx',
+  'src/app/login/page.tsx',
+  'src/app/(dashboard)/layout.tsx',
+  'src/app/(dashboard)/template.tsx',
+  'src/proxy.ts',
+  'electron/main.js'
+].filter(f => fs.existsSync(f));
+
+// Level 3: Core services, API handlers, and backend logic
+const level3Lib = getFilesInDir('src/lib');
+const level3Actions = getFilesInDir('src/app/actions');
+const level3Api = getFilesInDir('src/app/api');
+const level3 = [...level3Lib, ...level3Actions, ...level3Api].filter((v, i, a) => a.indexOf(v) === i);
+
+// Level 4: UI components, screens, and styling
+const level4Css = ['src/app/globals.css'].filter(f => fs.existsSync(f));
+const level4Components = getFilesInDir('src/components');
+const level4Pages = getFilesInDir('src/app/(dashboard)').filter(f => !level2.includes(f) && !level4Components.includes(f));
+const level4 = [...level4Css, ...level4Components, ...level4Pages].filter((v, i, a) => a.indexOf(v) === i);
+
+// Level 5: Platform-specific configurations, database scripts, deployment utilities
+const level5Db = [
+  'prisma/seed.ts',
+  'supabase-rls-full.sql',
+  'supabase-sale-function.sql',
+  'supabase-sequences.sql'
+].filter(f => fs.existsSync(f));
+
+const level5Build = ['build/installer.nsh'].filter(f => fs.existsSync(f));
+
+const level5Scripts = getFilesInDir('scripts')
+  .filter(f => !f.endsWith('.png') && !f.endsWith('.jpg') && !f.endsWith('.jpeg'));
+
+const level5 = [...level5Db, ...level5Build, ...level5Scripts].filter((v, i, a) => a.indexOf(v) === i);
+
+const sections = [
+  { level: 1, title: 'LEVEL 1: ROOT CONFIGURATION AND DEPENDENCY FILES', files: level1 },
+  { level: 2, title: 'LEVEL 2: MAIN ENTRY POINT / INITIALIZATION FILES', files: level2 },
+  { level: 3, title: 'LEVEL 3: CORE SERVICES, API HANDLERS, AND BACKEND LOGIC', files: level3 },
+  { level: 4, title: 'LEVEL 4: UI COMPONENTS, SCREENS, AND STYLING', files: level4 },
+  { level: 5, title: 'LEVEL 5: PLATFORM-SPECIFIC CONFIGURATIONS, DATABASE SCRIPTS, AND DEPLOYMENT UTILITIES', files: level5 }
+];
+
+let output = '';
+let fileCount = 0;
+
+for (const section of sections) {
+  for (const relPath of section.files) {
+    if (!fs.existsSync(relPath)) {
+      console.warn('Warning: file not found:', relPath);
+      continue;
+    }
+    const content = fs.readFileSync(relPath, 'utf8');
+    output += `--- FILE: ${relPath} ---\n`;
+    output += content;
+    if (!content.endsWith('\n')) {
+      output += '\n';
+    }
+    output += '\n';
+    fileCount++;
+  }
+}
+
+fs.writeFileSync('full_project_dump.md', output, 'utf8');
+console.log(`Successfully generated full_project_dump.md with ${fileCount} files. Size: ${(output.length / 1024 / 1024).toFixed(2)} MB`);
 
 --- FILE: scripts/get-ids.js ---
 const fs = require('fs');
